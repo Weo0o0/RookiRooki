@@ -40,7 +40,7 @@ wsl -d Ubuntu
 systemd는 Docker 같은 프로그램을 서비스로 등록하고 자동으로 켜 주는 관리자입니다. Docker 설치 전에 켜 둬야 Docker 서비스가 자동으로 실행됩니다.
 
 ```bash
-sudo nano /etc/wsl.conf
+sudo nano(vi 가능) /etc/wsl.conf
 ```
 아래 두 줄을 넣고 `Ctrl+O` → `Enter`로 저장, `Ctrl+X`로 나옵니다.
 ```ini
