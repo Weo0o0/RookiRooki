@@ -1,0 +1,139 @@
+# Mini-SIEM 실습망 초안 (저장소에 바로 커밋하지 말 것)
+# 확정 주소: DECISIONS.md 3번, README.md, docs/ARCHITECTURE.md
+# 파일 위치는 공식 폴더 트리에 없음 → PM·시나리오 담당과 합의 필요
+# (제안: 합의 후 scenarios/lab/ 또는 저장소 루트)
+
+name: minisiem
+
+services:
+  victim-web:
+    build: ./victim-web
+    image: minisiem-victim-web:lab
+    container_name: victim-web
+    hostname: victim-web
+    networks:
+      mini-siem-net:
+        ipv4_address: 172.28.0.10
+    # 기본은 호스트에 포트를 열지 않음. 브라우저로만 보고 싶을 때만 주석 해제.
+    # ports:
+    #   - "127.0.0.1:8080:80"
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1/health', timeout=2)",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  victim-pc:
+    build: ./victim-pc
+    image: minisiem-victim-pc:lab
+    container_name: victim-pc
+    hostname: victim-pc
+    networks:
+      mini-siem-net:
+        ipv4_address: 172.28.0.11
+    # SSH를 호스트에 노출하지 않음. 실습은 attacker 컨테이너에서만.
+    restart: unless-stopped
+
+  attacker:
+    build: ./attacker
+    image: minisiem-attacker:lab
+    container_name: attacker
+    hostname: attacker
+    networks:
+      mini-siem-net:
+        ipv4_address: 172.28.0.100
+    # nmap SYN 스캔(-sS)에 필요. 없어도 -sT(connect)는 가능.
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
+    tty: true
+    restart: unless-stopped
+
+  # Linux Docker Engine(또는 WSL2 안에 엔진을 직접 설치한 경우) 전용.
+  # 호스트 네트워크 네임스페이스에서 브리지 br-minisiem을 보고 양쪽 트래픽을 한 파일에 저장.
+  # Docker Desktop의 host networking은 L4(TCP/UDP)만 지원하고
+  # 컨테이너가 호스트 인터페이스에 직접 접근하지 못함.
+  # 근거: https://docs.docker.com/engine/network/drivers/host/
+  capture:
+    image: nicolaka/netshoot:latest
+    container_name: mini-siem-capture
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    volumes:
+      - ./pcaps:/pcaps
+    command:
+      [
+        "tcpdump",
+        "-i",
+        "br-minisiem",
+        "-n",
+        "-U",
+        "-w",
+        "/pcaps/lab_capture.pcap",
+      ]
+    depends_on:
+      victim-web:
+        condition: service_started
+      victim-pc:
+        condition: service_started
+    profiles: ["linux-capture"]
+
+  # Docker Desktop(Windows) 폴백. 브리지를 호스트에서 볼 수 없을 때
+  # 각 타깃의 네트워크 네임스페이스에서 녹화한 뒤 파일 두 개를 하나로 합침.
+  # network_mode: service:<서비스> 는 Compose 공식 문법.
+  capture-web:
+    image: nicolaka/netshoot:latest
+    container_name: mini-siem-capture-web
+    network_mode: "service:victim-web"
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    volumes:
+      - ./pcaps:/pcaps
+    command:
+      ["tcpdump", "-i", "eth0", "-n", "-U", "-w", "/pcaps/web.pcap"]
+    depends_on:
+      victim-web:
+        condition: service_started
+    profiles: ["desktop-capture"]
+
+  capture-pc:
+    image: nicolaka/netshoot:latest
+    container_name: mini-siem-capture-pc
+    network_mode: "service:victim-pc"
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    volumes:
+      - ./pcaps:/pcaps
+    command:
+      ["tcpdump", "-i", "eth0", "-n", "-U", "-w", "/pcaps/ssh.pcap"]
+    depends_on:
+      victim-pc:
+        condition: service_started
+    profiles: ["desktop-capture"]
+
+networks:
+  mini-siem-net:
+    name: mini-siem-net
+    driver: bridge
+    # 실습망 안에서만 통신. 컨테이너에서 인터넷으로 나가지 않음.
+    # 공식 README에 적힌 옵션은 아니지만, "격리된 실습망에서만 공격" 규칙에 맞춤.
+    internal: true
+    driver_opts:
+      # 브리지 이름을 br-<해시> 대신 고정. 공식 옵션:
+      # https://docs.docker.com/engine/network/drivers/bridge/#options
+      com.docker.network.bridge.name: br-minisiem
+    ipam:
+      config:
+        - subnet: 172.28.0.0/24
+          gateway: 172.28.0.1
