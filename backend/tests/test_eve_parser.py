@@ -20,3 +20,10 @@ def test_same_flow_does_not_use_other_request(tmp_path):
     p = tmp_path / "eve.json"
     write(p, [alert(1000001, tx=1), {"event_type":"http","flow_id":1,"tx_id":2,"http":{"status":200,"url":"/other"}}, {"event_type":"http","flow_id":1,"tx_id":1,"http":{"status":403,"url":"/attack"}}])
     assert parse_eve(p)[0][0]["severity"] == "SEV3"
+
+def test_json_masking(tmp_path):
+    p = tmp_path / "eve.json"
+    write(p, [{"event_type":"alert", "alert":{"signature_id":1000002,"signature":"{\"password\": \"abc\"}"}}])
+    rows, _ = parse_eve(p)
+    assert rows[0]["signature"] == '{"password": "[MASKED]"}'
+    assert rows[0]["pii_masked"] == 1
