@@ -11,7 +11,10 @@ from __future__ import annotations
 import html
 import sqlite3
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from threading import Thread
 from urllib.parse import parse_qs, urlparse
+from urllib.error import HTTPError, URLError
+from urllib.request import urlopen
 
 DB_PATH = "/tmp/lab.db"
 LISTEN = ("0.0.0.0", 80)
@@ -106,6 +109,26 @@ class LabHandler(BaseHTTPRequestHandler):
         if path == "/health":
             self._send(200, "ok\n", "text/plain; charset=utf-8")
             return
+        if path == "/fetch":
+            target = params.get("url", [""])[0]
+            target_info = urlparse(target)
+
+            # 실습망 내부 HTTP 주소만 허용
+            allowed_hosts = {"172.28.0.10", "172.28.0.11"}
+            if (
+                target_info.scheme != "http"
+                or target_info.hostname not in allowed_hosts
+            ):
+                self._send(403, "<h1>403 forbidden target</h1>")
+                return
+
+            try:
+                with urlopen(target, timeout=2) as response:
+                    body = response.read(4096).decode("utf-8", errors="replace")
+                self._send(200, body, "text/plain; charset=utf-8")
+            except (HTTPError, URLError, TimeoutError, OSError):
+                self._send(403, "<h1>403 upstream unavailable</h1>")
+            return
         if path == "/login":
             username = params.get("username", [""])[0]
             password = params.get("password", [""])[0]
@@ -138,11 +161,16 @@ class LabHandler(BaseHTTPRequestHandler):
         self._send(404, "<h1>404</h1>")
 
 
+def serve(port: int) -> None:
+    httpd = ThreadingHTTPServer(("0.0.0.0", port), LabHandler)
+    print(f"victim-web listening on 0.0.0.0:{port}", flush=True)
+    httpd.serve_forever()
+
+
 def main() -> None:
     init_db()
-    httpd = ThreadingHTTPServer(LISTEN, LabHandler)
-    print("victim-web listening on 0.0.0.0:80", flush=True)
-    httpd.serve_forever()
+    Thread(target=serve, args=(80,), daemon=True).start()
+    serve(8443)
 
 
 if __name__ == "__main__":

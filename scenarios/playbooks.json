@@ -78,5 +78,45 @@
         "rollback": "ufw delete deny from {{SRC_IP}} to any"
       }
     }
+  },
+  "c2_beacon": {
+    "category": "c2_beacon",
+    "sid": 1000005,
+    "name": "C2 beacon repeated connection",
+    "severity": "MEDIUM",
+    "description": "Repeated TCP connections from attacker 172.28.0.100 to victim-web 172.28.0.10:8443 within the agreed 30-second window.",
+    "preserve_evidence_first": "Preserve the pcap and connection timestamps first; collect the relevant service and network logs before blocking the source.",
+    "actions": {
+      "linux": {
+        "verify": "ss -tanp '( sport = :{{DEST_PORT}} and src {{SRC_IP}} )' && journalctl --since '-5 min' | tail -n 50",
+        "block": "iptables -I INPUT 1 -s {{SRC_IP}} -p tcp --dport {{DEST_PORT}} -j DROP",
+        "rollback": "iptables -D INPUT -s {{SRC_IP}} -p tcp --dport {{DEST_PORT}} -j DROP"
+      },
+      "ufw": {
+        "verify": "ufw status numbered | grep '{{SRC_IP}}'",
+        "block": "ufw insert 1 deny from {{SRC_IP}} to any port {{DEST_PORT}} proto tcp",
+        "rollback": "ufw delete deny from {{SRC_IP}} to any port {{DEST_PORT}} proto tcp"
+      }
+    }
+  },
+  "ssrf": {
+    "category": "ssrf",
+    "sid": 1000006,
+    "name": "SSRF internal resource access",
+    "severity": "HIGH",
+    "description": "The /fetch?url= endpoint receives an internal URL; access to http://172.28.0.10/health returns HTTP 200, while the failed case is mapped to HTTP 403.",
+    "preserve_evidence_first": "Preserve the request URL, HTTP status, application logs, and pcap first; collect evidence before blocking the source.",
+    "actions": {
+      "linux": {
+        "verify": "ss -tanp '( sport = :{{DEST_PORT}} and src {{SRC_IP}} )' && tail -n 50 /var/log/nginx/access.log | grep '{{SRC_IP}}'",
+        "block": "iptables -I INPUT 1 -s {{SRC_IP}} -p tcp --dport {{DEST_PORT}} -j DROP",
+        "rollback": "iptables -D INPUT -s {{SRC_IP}} -p tcp --dport {{DEST_PORT}} -j DROP"
+      },
+      "ufw": {
+        "verify": "ufw status numbered | grep '{{SRC_IP}}'",
+        "block": "ufw insert 1 deny from {{SRC_IP}} to any port {{DEST_PORT}} proto tcp",
+        "rollback": "ufw delete deny from {{SRC_IP}} to any port {{DEST_PORT}} proto tcp"
+      }
+    }
   }
 }
