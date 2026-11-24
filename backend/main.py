@@ -457,7 +457,7 @@ def stats():
             if not isinstance(rule_data_sources, list):
                 rule_data_sources = []
 
-            missing = [s for s in rule_data_sources if s not in present_sources]
+            missing = [str(s) for s in rule_data_sources if str(s) not in present_sources]
             if missing:
                 blind_rules.append({
                     "sid": sid_val,
