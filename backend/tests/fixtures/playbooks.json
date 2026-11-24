@@ -1,0 +1,34 @@
+{
+  "sqli": {
+    "osi_layer": "Application",
+    "flow": "Investigate web application logs and database queries",
+    "preserve_evidence_first": true,
+    "verify": "curl -i 'http://{{DEST_IP}}:{{DEST_PORT}}/test'",
+    "block": "iptables -A INPUT -s {{SRC_IP}} -j DROP",
+    "rollback": "iptables -D INPUT -s {{SRC_IP}} -j DROP"
+  },
+  "xss": {
+    "osi_layer": "Application",
+    "flow": "Check browser reflection",
+    "preserve_evidence_first": false,
+    "verify": "curl -i 'http://{{DEST_IP}}:{{DEST_PORT}}/'",
+    "block": "iptables -A INPUT -s {{SRC_IP}} -j DROP",
+    "rollback": "iptables -D INPUT -s {{SRC_IP}} -j DROP"
+  },
+  "bruteforce": {
+    "osi_layer": "Transport",
+    "flow": "Examine failed authentication counts",
+    "preserve_evidence_first": true,
+    "verify": "lastb -a",
+    "block": "iptables -A INPUT -s {{SRC_IP}} -j DROP",
+    "rollback": "iptables -D INPUT -s {{SRC_IP}} -j DROP"
+  },
+  "portscan": {
+    "osi_layer": "Network",
+    "flow": "Verify port sweep patterns",
+    "preserve_evidence_first": false,
+    "verify": "netstat -tuln",
+    "block": "iptables -A INPUT -s {{SRC_IP}} -j DROP",
+    "rollback": "iptables -D INPUT -s {{SRC_IP}} -j DROP"
+  }
+}

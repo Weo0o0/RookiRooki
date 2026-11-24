@@ -1,0 +1,58 @@
+[
+  {
+    "sid": 1000001,
+    "category": "sqli",
+    "title": "SQL Injection",
+    "status": "active",
+    "mitre_tactic": "Initial Access",
+    "mitre_id": "T1190",
+    "base_severity": "SEV3",
+    "escalated_severity": "SEV1",
+    "data_sources": ["suricata_alert", "suricata_http"],
+    "false_positives": "Scanner activity",
+    "validation_pcap": "sqli.pcap",
+    "notes": "SQLi alert"
+  },
+  {
+    "sid": 1000002,
+    "category": "xss",
+    "title": "Cross-Site Scripting",
+    "status": "active",
+    "mitre_tactic": "Initial Access",
+    "mitre_id": "T1189",
+    "base_severity": "SEV3",
+    "escalated_severity": "SEV1",
+    "data_sources": ["suricata_alert", "suricata_http"],
+    "false_positives": "None",
+    "validation_pcap": "xss.pcap",
+    "notes": "XSS alert"
+  },
+  {
+    "sid": 1000003,
+    "category": "bruteforce",
+    "title": "SSH Brute Force",
+    "status": "active",
+    "mitre_tactic": "Credential Access",
+    "mitre_id": "T1110.001",
+    "base_severity": "SEV2",
+    "escalated_severity": "SEV2",
+    "data_sources": ["suricata_alert"],
+    "false_positives": "Admin fat-finger",
+    "validation_pcap": "ssh.pcap",
+    "notes": "SSH alert"
+  },
+  {
+    "sid": 1000005,
+    "category": "flow_anomaly",
+    "title": "Flow Anomaly",
+    "status": "active",
+    "mitre_tactic": "Discovery",
+    "mitre_id": "T1046",
+    "base_severity": "SEV3",
+    "escalated_severity": "SEV3",
+    "data_sources": ["suricata_alert", "suricata_ssh"],
+    "false_positives": "Network scan",
+    "validation_pcap": "scan.pcap",
+    "notes": "Requires suricata_ssh data source"
+  }
+]
