@@ -917,37 +917,34 @@
       }
 
       // 출발지 -> 목적지(dest_ip:dest_port) 링크 집계
-      // selected와 매칭되는지 확인용 키: `${alert.src_ip} -> ${alert.dest_ip}:${alert.dest_port}`
+      // c2_beacon과 다른 공격이 같은 경로에 있으면 선을 분리한다.
       const linksMap = new Map();
       items.forEach(a => {
         const src = a.src_ip || "unknown";
         const dst = `${a.dest_ip || "unknown"}:${a.dest_port ?? "unknown"}`;
         const key = `${src} -> ${dst}`;
-        const cat = String(a.category || "").toLowerCase();
-        const isC2 = cat === "c2_beacon";
-
         if (!linksMap.has(key)) {
-          linksMap.set(key, {
-            src,
-            dst,
-            count: 0,
-            highestSev: a.severity || "SEV4",
-            hasC2: isC2
-          });
+          linksMap.set(key, { src, dst, c2Alerts: [], otherAlerts: [] });
         }
-
-        const link = linksMap.get(key);
-        link.count++;
-        if (isC2) link.hasC2 = true;
-
-        // 심각도 가중치: SEV1 > SEV2 > SEV3 > SEV4
-        const sevOrder = { SEV1: 1, SEV2: 2, SEV3: 3, SEV4: 4 };
-        const currentRank = sevOrder[link.highestSev] || 4;
-        const newRank = sevOrder[a.severity] || 4;
-        if (newRank < currentRank) {
-          link.highestSev = a.severity;
-        }
+        const bucket = linksMap.get(key);
+        const cat = String(a.category || "").toLowerCase();
+        if (cat === "c2_beacon") bucket.c2Alerts.push(a);
+        else bucket.otherAlerts.push(a);
       });
+
+      const getPathHighestSev = (alertList) => {
+        const sevOrder = { SEV1: 1, SEV2: 2, SEV3: 3, SEV4: 4 };
+        let highest = "SEV4";
+        let minRank = 4;
+        alertList.forEach(a => {
+          const rank = sevOrder[a.severity] || 4;
+          if (rank < minRank) {
+            minRank = rank;
+            highest = a.severity;
+          }
+        });
+        return highest;
+      };
 
       const links = Array.from(linksMap.values());
       const uniqueSrcs = Array.from(new Set(links.map(l => l.src)));
@@ -1006,52 +1003,42 @@
         dstCoords.set(dst, { x: 385, y: getDstY(idx, uniqueDsts.length) });
       });
 
-      // 선택된 경보의 출발지-목적지 키 확인
-      const selectedKey = selected ? `${selected.src_ip || "unknown"} -> ${selected.dest_ip || "unknown"}:${selected.dest_port ?? "unknown"}` : null;
-
-      // 1. 링크 (선) 그리기
-      links.forEach(link => {
-        const start = srcCoords.get(link.src);
-        const end = dstCoords.get(link.dst);
+      const drawPathLink = (src, dst, alerts, isC2, yOffset) => {
+        if (!alerts.length) return;
+        const start = srcCoords.get(src);
+        const end = dstCoords.get(dst);
         if (!start || !end) return;
 
-        const isCurrentSelected = selectedKey === `${link.src} -> ${link.dst}`;
-        const strokeColor = getSeverityHexColor(link.highestSev);
+        const isCurrentSelected = selected && alerts.some(a => String(a.id) === String(selected.id));
+        const highestSev = getPathHighestSev(alerts);
+        const strokeColor = getSeverityHexColor(highestSev);
         const strokeWidth = isCurrentSelected ? 4 : 2;
 
         const g = document.createElementNS(svgNS, "g");
 
         const line = document.createElementNS(svgNS, "line");
         line.setAttribute("x1", String(start.x));
-        line.setAttribute("y1", String(start.y));
+        line.setAttribute("y1", String(start.y + yOffset));
         line.setAttribute("x2", String(end.x));
-        line.setAttribute("y2", String(end.y));
+        line.setAttribute("y2", String(end.y + yOffset));
         line.setAttribute("stroke", strokeColor);
         line.setAttribute("stroke-width", String(strokeWidth));
 
-        // c2_beacon 구간은 방향 미정이므로 화살표 없이 '방향 미정' 라벨 처리
-        if (!link.hasC2) {
-          line.setAttribute("marker-end", `url(#arrow-${link.highestSev})`);
+        if (!isC2) {
+          line.setAttribute("marker-end", `url(#arrow-${highestSev})`);
         } else {
           line.setAttribute("stroke-dasharray", "4 3");
         }
 
-        if (isCurrentSelected) {
-          line.setAttribute("stroke-opacity", "1");
-        } else {
-          line.setAttribute("stroke-opacity", "0.75");
-        }
-
+        line.setAttribute("stroke-opacity", isCurrentSelected ? "1" : "0.75");
         g.appendChild(line);
 
-        // 선 중앙에 경보 수 또는 방향 미정 라벨 표시
         const midX = (start.x + end.x) / 2;
-        const midY = (start.y + end.y) / 2;
-
-        const labelText = link.hasC2 ? `${link.count}건 (방향 미정)` : `${link.count}건`;
+        const midY = (start.y + end.y) / 2 + yOffset;
+        const labelText = isC2 ? `${alerts.length}건 (방향 미정)` : `${alerts.length}건`;
+        const textWidth = isC2 ? 84 : 32;
 
         const badgeBg = document.createElementNS(svgNS, "rect");
-        const textWidth = link.hasC2 ? 84 : 32;
         badgeBg.setAttribute("x", String(midX - textWidth / 2));
         badgeBg.setAttribute("y", String(midY - 9));
         badgeBg.setAttribute("width", String(textWidth));
@@ -1073,6 +1060,13 @@
         g.appendChild(countSvgText);
 
         svg.appendChild(g);
+      };
+
+      // 1. 링크 (선) 그리기: c2와 그 외 공격을 분리
+      links.forEach(bucket => {
+        const hasBoth = bucket.c2Alerts.length > 0 && bucket.otherAlerts.length > 0;
+        drawPathLink(bucket.src, bucket.dst, bucket.c2Alerts, true, hasBoth ? -8 : 0);
+        drawPathLink(bucket.src, bucket.dst, bucket.otherAlerts, false, hasBoth ? 8 : 0);
       });
 
       // 2. Suricata 관찰자 노드 (공격자와 목적지 사이 통과 지점이 아니라 점선으로 연결된 옆의 관찰자 노드)
