@@ -1,0 +1,5 @@
+# Temporary test rules; replace with the rule owner's custom.rules.
+alert tcp any any -> any any (msg:"SQLi"; sid:1000001; rev:1;)
+alert tcp any any -> any any (msg:"XSS"; sid:1000002; rev:1;)
+alert tcp any any -> any any (msg:"Bruteforce"; sid:1000003; rev:1;)
+alert tcp any any -> any any (msg:"Portscan"; sid:1000004; rev:1;)
