@@ -153,7 +153,7 @@ def test_alerts_list_keys_and_pagination_and_validation(monkeypatch, tmp_path):
     for item in body["items"]:
         assert list(item.keys()) == EXPECTED_ALERT_KEYS
         assert item["playbook"] is not None
-        assert item["category"] in ("sqli", "xss", "bruteforce", "portscan")
+        assert item["category"] in ("sqli", "xss", "bruteforce", "portscan", "c2_beacon", "ssrf")
 
     # Order newest first (id DESC)
     ids = [item["id"] for item in body["items"]]
@@ -316,3 +316,29 @@ def test_stats_category_counts_and_mitre_coverage_c2_and_ssrf(monkeypatch, tmp_p
     assert data["category_counts"].get("ssrf") == 1
     assert "T1071.001" in data["mitre_coverage"]
     assert "T1190" in data["mitre_coverage"]
+
+def test_alert_without_playbook_returns_null(monkeypatch, tmp_path):
+    c = make_client(monkeypatch, tmp_path)
+    temp_eve = tmp_path / "temp_eve.json"
+    event = {
+        "event_type": "alert",
+        "timestamp": "2026-11-24T00:00:01.000000+0000",
+        "flow_id": 10,
+        "alert": {"signature_id": 1000005, "signature": "sig_c2"},
+    }
+    temp_eve.write_text(json.dumps(event) + "\n", encoding="utf-8")
+    main.ingest_eve(temp_eve)
+
+    res = c.get("/api/alerts")
+    assert res.status_code == 200
+    body = res.json()
+    assert body["total"] == 1
+    assert len(body["items"]) == 1
+    assert body["items"][0]["category"] == "c2_beacon"
+    assert body["items"][0]["playbook"] is None
+
+    res_detail = c.get(f"/api/alerts/{body['items'][0]['id']}")
+    assert res_detail.status_code == 200
+    detail = res_detail.json()
+    assert detail["category"] == "c2_beacon"
+    assert detail["playbook"] is None
