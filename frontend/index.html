@@ -250,6 +250,17 @@
               <!-- JS로 치환된 명령어와 복사 버튼 렌더링 -->
             </div>
           </div>
+
+          <!-- 3-1. 분석 명령 안내 영역 (안내 전용 / 실행 버튼 없음) -->
+          <div class="space-y-2">
+            <div class="flex items-center justify-between">
+              <h4 class="text-xs font-bold uppercase tracking-wider text-teal-400">분석 명령 안내</h4>
+              <span class="text-[11px] text-slate-500">조사 가이드 · 복사 후 터미널 수동 실행</span>
+            </div>
+            <div id="analysisContainer" class="space-y-3 text-xs">
+              <!-- createElement 및 textContent로 동적 생성 (innerHTML 금지) -->
+            </div>
+          </div>
         </div>
 
         <!-- 4. 시각화 (공격 스토리 & 공격 경로) 패널 -->
@@ -368,7 +379,18 @@
         playbook: {
           block: "sudo iptables -A INPUT -s {{SRC_IP}} -d {{DEST_IP}} -p tcp --dport {{DEST_PORT}} -j DROP",
           verify: "sudo iptables -L INPUT -n -v | grep {{SRC_IP}}",
-          rollback: "sudo iptables -D INPUT -s {{SRC_IP}} -d {{DEST_IP}} -p tcp --dport {{DEST_PORT}} -j DROP"
+          rollback: "sudo iptables -D INPUT -s {{SRC_IP}} -d {{DEST_IP}} -p tcp --dport {{DEST_PORT}} -j DROP",
+          analysis: [
+            {
+              title: "웹 서버 접속 로그 분석",
+              where: "victim-web",
+              command: "docker logs --since 5m victim-web | grep '{{SRC_IP}}'",
+              tokens: [
+                { token: "victim-web", desc: "웹 서비스 컨테이너 이름" },
+                { token: "{{SRC_IP}}", desc: "공격을 시도한 출발지 IP" }
+              ]
+            }
+          ]
         }
       },
       {
@@ -393,7 +415,17 @@
         playbook: {
           block: "sudo ufw deny from {{SRC_IP}} to {{DEST_IP}} port {{DEST_PORT}}",
           verify: "sudo ufw status numbered | grep {{SRC_IP}}",
-          rollback: "sudo ufw delete deny from {{SRC_IP}} to {{DEST_IP}} port {{DEST_PORT}}"
+          rollback: "sudo ufw delete deny from {{SRC_IP}} to {{DEST_IP}} port {{DEST_PORT}}",
+          analysis: [
+            {
+              title: "XSS 스크립트 요청 로그 확인",
+              where: "victim-web",
+              command: "docker logs --since 5m victim-web | grep -E '<script|alert'",
+              tokens: [
+                { token: "victim-web", desc: "웹 애플리케이션 컨테이너" }
+              ]
+            }
+          ]
         }
       },
       {
@@ -418,7 +450,18 @@
         playbook: {
           block: "sudo iptables -A INPUT -s {{SRC_IP}} -p tcp --dport {{DEST_PORT}} -j DROP",
           verify: "sudo iptables -L INPUT -n --line-numbers | grep {{SRC_IP}}",
-          rollback: "sudo iptables -D INPUT -s {{SRC_IP}} -p tcp --dport {{DEST_PORT}} -j DROP"
+          rollback: "sudo iptables -D INPUT -s {{SRC_IP}} -p tcp --dport {{DEST_PORT}} -j DROP",
+          analysis: [
+            {
+              title: "로그인 실패 로그 확인",
+              where: "victim-web",
+              command: "docker logs --since 5m victim-web | grep '401' | grep '{{SRC_IP}}'",
+              tokens: [
+                { token: "victim-web", desc: "웹 서비스 컨테이너" },
+                { token: "{{SRC_IP}}", desc: "접속 시도자 IP" }
+              ]
+            }
+          ]
         }
       },
       {
@@ -475,6 +518,14 @@
         return Number.isInteger(num) && num >= 1 && num <= 65535 ? String(num) : "INVALID_PORT";
       }
       return "";
+    }
+
+    // 분석 명령 템플릿의 {{SRC_IP}}, {{DEST_PORT}} 안전 치환 (프론트 전용)
+    function replaceAnalysisVars(template, alert) {
+      if (!template) return "";
+      return String(template)
+        .replaceAll("{{SRC_IP}}", sanitizeCliToken(alert.src_ip, "ip"))
+        .replaceAll("{{DEST_PORT}}", sanitizeCliToken(alert.dest_port, "port"));
     }
 
     // 플레이북 템플릿의 {{SRC_IP}}, {{DEST_IP}}, {{DEST_PORT}} 안전 치환
@@ -752,6 +803,120 @@
             }
           });
         });
+      }
+
+      // 분석 명령 영역 렌더링 (createElement 및 textContent만 사용, innerHTML 금지)
+      const analysisContainer = document.getElementById("analysisContainer");
+      if (analysisContainer) {
+        while (analysisContainer.firstChild) {
+          analysisContainer.removeChild(analysisContainer.firstChild);
+        }
+
+        const analysisList = (alert.playbook && Array.isArray(alert.playbook.analysis)) ? alert.playbook.analysis : [];
+        if (!alert.playbook || analysisList.length === 0) {
+          const emptyBox = document.createElement("div");
+          emptyBox.className = "bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-center text-slate-500 font-mono text-[11px]";
+          emptyBox.textContent = "분석 명령 준비 중";
+          analysisContainer.appendChild(emptyBox);
+        } else {
+          analysisList.forEach(item => {
+            const card = document.createElement("div");
+            card.className = "bg-slate-950 border border-slate-800 rounded-lg p-2.5 space-y-2";
+
+            // 상단: 제목 + 위치 태그 + 복사 버튼
+            const header = document.createElement("div");
+            header.className = "flex items-center justify-between";
+
+            const titleWrap = document.createElement("div");
+            titleWrap.className = "flex items-center gap-2";
+
+            const titleSpan = document.createElement("span");
+            titleSpan.className = "font-semibold text-teal-300 text-[11px]";
+            titleSpan.textContent = item.title || "분석 명령";
+            titleWrap.appendChild(titleSpan);
+
+            if (item.where) {
+              const whereBadge = document.createElement("span");
+              whereBadge.className = "px-1.5 py-0.2 rounded text-[10px] bg-slate-800 text-slate-400 border border-slate-700";
+              whereBadge.textContent = item.where;
+              titleWrap.appendChild(whereBadge);
+            }
+            header.appendChild(titleWrap);
+
+            const copyBtn = document.createElement("button");
+            copyBtn.type = "button";
+            copyBtn.className = "px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded text-[11px] transition";
+            copyBtn.textContent = "복사";
+
+            const substitutedCmd = replaceAnalysisVars(item.command || "", alert);
+            copyBtn.addEventListener("click", async () => {
+              if (!substitutedCmd) return;
+              try {
+                await navigator.clipboard.writeText(substitutedCmd);
+                copyBtn.textContent = "복사됨!";
+                setTimeout(() => {
+                  copyBtn.textContent = "복사";
+                }, 1200);
+              } catch (_) {
+                setStatus("클립보드 복사 권한이 차단되어 있습니다.", true);
+              }
+            });
+            header.appendChild(copyBtn);
+            card.appendChild(header);
+
+            // 명령 코드 박스
+            const codeBlock = document.createElement("code");
+            codeBlock.className = "block font-mono text-[11px] text-slate-300 break-all bg-slate-900/60 p-2 rounded border border-slate-800/80";
+            codeBlock.textContent = substitutedCmd || "명령어 없음";
+            card.appendChild(codeBlock);
+
+            // 토큰별 해설 표
+            const tokens = Array.isArray(item.tokens) ? item.tokens : [];
+            if (tokens.length > 0) {
+              const table = document.createElement("table");
+              table.className = "w-full text-[10px] border-collapse mt-1 border border-slate-800";
+
+              const thead = document.createElement("thead");
+              const trHead = document.createElement("tr");
+              trHead.className = "bg-slate-900/80 text-slate-400 border-b border-slate-800";
+
+              const thTok = document.createElement("th");
+              thTok.className = "text-left py-1 px-2 font-medium w-1/3";
+              thTok.textContent = "항목";
+              trHead.appendChild(thTok);
+
+              const thDesc = document.createElement("th");
+              thDesc.className = "text-left py-1 px-2 font-medium";
+              thDesc.textContent = "해설";
+              trHead.appendChild(thDesc);
+
+              thead.appendChild(trHead);
+              table.appendChild(thead);
+
+              const tbody = document.createElement("tbody");
+              tokens.forEach(tok => {
+                const tr = document.createElement("tr");
+                tr.className = "border-b border-slate-800/50 hover:bg-slate-900/30";
+
+                const tdTok = document.createElement("td");
+                tdTok.className = "py-1 px-2 font-mono text-teal-300";
+                tdTok.textContent = tok.token || "";
+                tr.appendChild(tdTok);
+
+                const tdDesc = document.createElement("td");
+                tdDesc.className = "py-1 px-2 text-slate-300";
+                tdDesc.textContent = tok.desc || "";
+                tr.appendChild(tdDesc);
+
+                tbody.appendChild(tr);
+              });
+              table.appendChild(tbody);
+              card.appendChild(table);
+            }
+
+            analysisContainer.appendChild(card);
+          });
+        }
       }
     }
 
