@@ -1,3 +1,4 @@
+import hashlib
 import json
 import logging
 import os
@@ -50,6 +51,7 @@ class UploadResult(BaseModel):
     alerts_stored: int
     duplicates_skipped: int
     skipped_lines: int
+    duplicate_of: Optional[str] = None
 
 class IngestSampleResult(BaseModel):
     alerts_stored: int
@@ -118,15 +120,23 @@ def init_db():
             "assessment TEXT DEFAULT '', "
             "confidence TEXT DEFAULT 'MEDIUM')"
         )
+        db.execute("DROP INDEX IF EXISTS ux_alert_identity")
         try:
             db.execute(
-                "CREATE UNIQUE INDEX IF NOT EXISTS ux_alert_identity ON alerts("
-                "timestamp, IFNULL(flow_id,-1), sid, IFNULL(src_ip,''), IFNULL(dest_ip,''), "
+                "CREATE UNIQUE INDEX IF NOT EXISTS ux_alert_identity_v2 ON alerts("
+                "timestamp, sid, IFNULL(src_ip,''), IFNULL(dest_ip,''), "
                 "IFNULL(dest_port,-1), IFNULL(raw_url,''))"
             )
         except sqlite3.OperationalError as exc:
-            logging.warning("Failed to create ux_alert_identity index (existing duplicates?): %s", exc)
+            logging.warning("Failed to create ux_alert_identity_v2 index (existing duplicates?): %s", exc)
 
+        db.execute(
+            "CREATE TABLE IF NOT EXISTS pcap_uploads ("
+            "sha256 TEXT PRIMARY KEY, "
+            "upload_id TEXT, "
+            "alerts_stored INTEGER, "
+            "created_at TEXT)"
+        )
         db.execute("CREATE TABLE IF NOT EXISTS ingest_sources (source TEXT PRIMARY KEY)")
         db.execute("CREATE TABLE IF NOT EXISTS ingest_meta (key TEXT PRIMARY KEY, value TEXT)")
         db.commit()
@@ -245,6 +255,7 @@ async def upload(file: UploadFile = File(...)):
     outdir.mkdir(parents=True, exist_ok=True)
     pcap = upload_dir / f"{upload_id}{ext}"
     size = 0
+    hasher = hashlib.sha256()
     try:
         with open(pcap, "wb") as target:
             while chunk := await file.read(1024 * 1024):
@@ -252,6 +263,33 @@ async def upload(file: UploadFile = File(...)):
                 if size > MAX_UPLOAD_BYTES:
                     raise HTTPException(413, "Upload too large")
                 target.write(chunk)
+                hasher.update(chunk)
+
+        file_hash = hasher.hexdigest()
+        init_db()
+        with closing(sqlite3.connect(db_path())) as db:
+            existing = db.execute(
+                "SELECT upload_id, alerts_stored FROM pcap_uploads WHERE sha256 = ?",
+                (file_hash,),
+            ).fetchone()
+
+        if existing:
+            prev_upload_id, prev_stored = existing
+            if pcap.exists():
+                pcap.unlink()
+            if outdir.exists():
+                try:
+                    outdir.rmdir()
+                except OSError:
+                    pass
+            return UploadResult(
+                upload_id=upload_id,
+                alerts_stored=0,
+                duplicates_skipped=prev_stored,
+                skipped_lines=0,
+                duplicate_of=prev_upload_id,
+            )
+
         try:
             result = await run_in_threadpool(run_suricata, pcap, outdir, rules)
         except FileNotFoundError:
@@ -263,15 +301,29 @@ async def upload(file: UploadFile = File(...)):
             raise HTTPException(502, f"Suricata failed with return code {result.returncode}")
         eve_path = outdir / "eve.json"
         stored, duplicates, skipped = ingest_eve(eve_path)
+
+        with closing(sqlite3.connect(db_path())) as db:
+            db.execute(
+                "INSERT OR REPLACE INTO pcap_uploads (sha256, upload_id, alerts_stored, created_at) VALUES (?, ?, ?, ?)",
+                (file_hash, upload_id, stored, datetime.now(timezone.utc).isoformat()),
+            )
+            db.commit()
+
         return UploadResult(
             upload_id=upload_id,
             alerts_stored=stored,
             duplicates_skipped=duplicates,
             skipped_lines=skipped,
+            duplicate_of=None,
         )
     finally:
         if size > MAX_UPLOAD_BYTES and pcap.exists():
             pcap.unlink()
+            if outdir.exists():
+                try:
+                    outdir.rmdir()
+                except OSError:
+                    pass
 
 @app.post("/api/ingest/sample", response_model=IngestSampleResult)
 def ingest_sample():
@@ -388,13 +440,29 @@ def stats():
     catalog = load_rule_catalog()
     if catalog is not None and meta_ingest is not None:
         for rule in catalog:
-            rule_data_sources = rule.get("data_sources", [])
+            if not isinstance(rule, dict):
+                continue
+            try:
+                sid_raw = rule.get("sid")
+                if sid_raw is None:
+                    continue
+                sid_val = int(sid_raw)
+            except (ValueError, TypeError):
+                continue
+
+            category_val = str(rule.get("category", "") or "")
+            title_val = str(rule.get("title", "") or "")
+
+            rule_data_sources = rule.get("data_sources")
+            if not isinstance(rule_data_sources, list):
+                rule_data_sources = []
+
             missing = [s for s in rule_data_sources if s not in present_sources]
             if missing:
                 blind_rules.append({
-                    "sid": rule.get("sid"),
-                    "category": rule.get("category"),
-                    "title": rule.get("title"),
+                    "sid": sid_val,
+                    "category": category_val,
+                    "title": title_val,
                     "missing_sources": missing,
                 })
 
