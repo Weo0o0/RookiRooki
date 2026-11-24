@@ -69,6 +69,8 @@ def parse_eve(path):
         if not isinstance(http_data, dict):
             http_data = {}
         status = http_data.get("status", data.get("status"))
+        if category not in ("sqli", "xss"):
+            status = None  # http_status is only for web attacks (ARCHITECTURE.md)
         url = http_data.get("url", data.get("url", ""))
         signature, m1 = mask_text(alert.get("signature", ""))
         raw_url, m2 = mask_text(url)

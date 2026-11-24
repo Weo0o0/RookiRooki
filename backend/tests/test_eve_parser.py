@@ -41,6 +41,7 @@ def test_status_rules_and_numeric_sid_and_bad_nested_fields(tmp_path):
     p.write_text("\n".join(json.dumps(x) for x in events))
     rows, _ = parse_eve(p)
     assert [(row["severity"], row["is_confirmed_risk"]) for row in rows] == [("SEV3", 0), ("SEV2", 0), ("SEV3", 0)]
+    assert [row["http_status"] for row in rows] == [404, None, None]
 
 def test_query_masking(tmp_path):
     p = tmp_path / "eve.json"
