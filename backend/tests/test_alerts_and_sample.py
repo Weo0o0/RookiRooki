@@ -263,10 +263,10 @@ def test_stats_blind_rules(monkeypatch, tmp_path):
 
     stats1 = c.get("/api/stats").json()
     assert stats1["total"] == 4
-    # Rule 1000005 requires ["suricata_alert", "suricata_ssh"], so suricata_ssh is missing!
+    # Rule 9000001 requires ["suricata_alert", "suricata_ssh"], so suricata_ssh is missing!
     blind = stats1["blind_rules"]
     assert len(blind) == 1
-    assert blind[0]["sid"] == 1000005
+    assert blind[0]["sid"] == 9000001
     assert blind[0]["category"] == "flow_anomaly"
     assert blind[0]["title"] == "Flow Anomaly"
     assert blind[0]["missing_sources"] == ["suricata_ssh"]
@@ -281,8 +281,8 @@ def test_stats_blind_rules(monkeypatch, tmp_path):
         "not a dict",
         123,
         {"sid": "not_an_int", "category": "bad", "title": "bad"},
-        {"sid": 1000006, "category": "bad_sources", "data_sources": "not_a_list"},
-        {"sid": 1000007, "data_sources": ["suricata_missing"]},
+        {"sid": 9000002, "category": "bad_sources", "data_sources": "not_a_list"},
+        {"sid": 9000003, "data_sources": ["suricata_missing"]},
     ]
     bad_cat_file = tmp_path / "malformed_catalog.json"
     bad_cat_file.write_text(json.dumps(bad_catalog), encoding="utf-8")
@@ -291,9 +291,9 @@ def test_stats_blind_rules(monkeypatch, tmp_path):
     res_malformed = c.get("/api/stats")
     assert res_malformed.status_code == 200
     malformed_stats = res_malformed.json()
-    # 1000007 should be listed since suricata_missing is missing from latest ingest
+    # 9000003 should be listed since suricata_missing is missing from latest ingest
     assert len(malformed_stats["blind_rules"]) == 1
-    assert malformed_stats["blind_rules"][0]["sid"] == 1000007
+    assert malformed_stats["blind_rules"][0]["sid"] == 9000003
     assert malformed_stats["blind_rules"][0]["category"] == ""
     assert malformed_stats["blind_rules"][0]["title"] == ""
     assert malformed_stats["blind_rules"][0]["missing_sources"] == ["suricata_missing"]
