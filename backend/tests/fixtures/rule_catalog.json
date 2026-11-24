@@ -42,7 +42,7 @@
     "notes": "SSH alert"
   },
   {
-    "sid": 1000005,
+    "sid": 9000001,
     "category": "flow_anomaly",
     "title": "Flow Anomaly",
     "status": "active",

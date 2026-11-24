@@ -47,3 +47,43 @@ def test_query_masking(tmp_path):
     p = tmp_path / "eve.json"
     write(p, [{"event_type":"alert", "http":{"url":"/login?user=a&password=abc&token=xyz"}, "alert":{"signature_id":1000001,"signature":"s"}}])
     assert parse_eve(p)[0][0]["raw_url"] == "/login?user=a&password=[MASKED]&token=[MASKED]"
+
+def test_c2_beacon_parsing(tmp_path):
+    p = tmp_path / "eve.json"
+    write(p, [alert(1000005)])
+    rows, _ = parse_eve(p)
+    assert len(rows) == 1
+    assert rows[0]["category"] == "c2_beacon"
+    assert rows[0]["mitre_id"] == "T1071.001"
+    assert rows[0]["severity"] == "SEV2"
+
+def test_ssrf_severity_escalation(tmp_path):
+    p = tmp_path / "eve.json"
+    write(p, [
+        alert(1000006, flow=1, tx=1),
+        {"event_type": "http", "flow_id": 1, "tx_id": 1, "http": {"status": 200, "url": "/"}},
+        alert(1000006, flow=2, tx=1),
+        {"event_type": "http", "flow_id": 2, "tx_id": 1, "http": {"status": 500, "url": "/"}},
+    ])
+    rows, _ = parse_eve(p)
+    assert len(rows) == 2
+    assert rows[0]["category"] == "ssrf"
+    assert rows[0]["http_status"] == 200
+    assert rows[0]["severity"] == "SEV1"
+    assert rows[0]["is_confirmed_risk"] == 1
+    assert rows[1]["category"] == "ssrf"
+    assert rows[1]["http_status"] == 500
+    assert rows[1]["severity"] == "SEV3"
+    assert rows[1]["is_confirmed_risk"] == 0
+
+def test_c2_beacon_with_http_200_not_escalated(tmp_path):
+    p = tmp_path / "eve.json"
+    write(p, [
+        alert(1000005, flow=1, tx=1),
+        {"event_type": "http", "flow_id": 1, "tx_id": 1, "http": {"status": 200, "url": "/"}},
+    ])
+    rows, _ = parse_eve(p)
+    assert len(rows) == 1
+    assert rows[0]["category"] == "c2_beacon"
+    assert rows[0]["severity"] == "SEV2"
+    assert rows[0]["http_status"] is None

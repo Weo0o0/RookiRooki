@@ -153,7 +153,7 @@ def test_alerts_list_keys_and_pagination_and_validation(monkeypatch, tmp_path):
     for item in body["items"]:
         assert list(item.keys()) == EXPECTED_ALERT_KEYS
         assert item["playbook"] is not None
-        assert item["category"] in ("sqli", "xss", "bruteforce", "portscan")
+        assert item["category"] in ("sqli", "xss", "bruteforce", "portscan", "c2_beacon", "ssrf")
 
     # Order newest first (id DESC)
     ids = [item["id"] for item in body["items"]]
@@ -263,10 +263,10 @@ def test_stats_blind_rules(monkeypatch, tmp_path):
 
     stats1 = c.get("/api/stats").json()
     assert stats1["total"] == 4
-    # Rule 1000005 requires ["suricata_alert", "suricata_ssh"], so suricata_ssh is missing!
+    # Rule 9000001 requires ["suricata_alert", "suricata_ssh"], so suricata_ssh is missing!
     blind = stats1["blind_rules"]
     assert len(blind) == 1
-    assert blind[0]["sid"] == 1000005
+    assert blind[0]["sid"] == 9000001
     assert blind[0]["category"] == "flow_anomaly"
     assert blind[0]["title"] == "Flow Anomaly"
     assert blind[0]["missing_sources"] == ["suricata_ssh"]
@@ -281,8 +281,8 @@ def test_stats_blind_rules(monkeypatch, tmp_path):
         "not a dict",
         123,
         {"sid": "not_an_int", "category": "bad", "title": "bad"},
-        {"sid": 1000006, "category": "bad_sources", "data_sources": "not_a_list"},
-        {"sid": 1000007, "data_sources": ["suricata_missing"]},
+        {"sid": 9000002, "category": "bad_sources", "data_sources": "not_a_list"},
+        {"sid": 9000003, "data_sources": ["suricata_missing"]},
     ]
     bad_cat_file = tmp_path / "malformed_catalog.json"
     bad_cat_file.write_text(json.dumps(bad_catalog), encoding="utf-8")
@@ -291,9 +291,54 @@ def test_stats_blind_rules(monkeypatch, tmp_path):
     res_malformed = c.get("/api/stats")
     assert res_malformed.status_code == 200
     malformed_stats = res_malformed.json()
-    # 1000007 should be listed since suricata_missing is missing from latest ingest
+    # 9000003 should be listed since suricata_missing is missing from latest ingest
     assert len(malformed_stats["blind_rules"]) == 1
-    assert malformed_stats["blind_rules"][0]["sid"] == 1000007
+    assert malformed_stats["blind_rules"][0]["sid"] == 9000003
     assert malformed_stats["blind_rules"][0]["category"] == ""
     assert malformed_stats["blind_rules"][0]["title"] == ""
     assert malformed_stats["blind_rules"][0]["missing_sources"] == ["suricata_missing"]
+
+def test_stats_category_counts_and_mitre_coverage_c2_and_ssrf(monkeypatch, tmp_path):
+    c = make_client(monkeypatch, tmp_path)
+    temp_eve = tmp_path / "temp_eve.json"
+    events = [
+        {"event_type": "alert", "timestamp": "2026-11-24T00:00:01.000000+0000", "flow_id": 10, "alert": {"signature_id": 1000005, "signature": "sig_c2"}},
+        {"event_type": "alert", "timestamp": "2026-11-24T00:00:02.000000+0000", "flow_id": 20, "alert": {"signature_id": 1000006, "signature": "sig_ssrf"}},
+    ]
+    temp_eve.write_text("\n".join(json.dumps(x) for x in events), encoding="utf-8")
+    main.ingest_eve(temp_eve)
+
+    res = c.get("/api/stats")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["total"] == 2
+    assert data["category_counts"].get("c2_beacon") == 1
+    assert data["category_counts"].get("ssrf") == 1
+    assert "T1071.001" in data["mitre_coverage"]
+    assert "T1190" in data["mitre_coverage"]
+
+def test_alert_without_playbook_returns_null(monkeypatch, tmp_path):
+    c = make_client(monkeypatch, tmp_path)
+    temp_eve = tmp_path / "temp_eve.json"
+    event = {
+        "event_type": "alert",
+        "timestamp": "2026-11-24T00:00:01.000000+0000",
+        "flow_id": 10,
+        "alert": {"signature_id": 1000005, "signature": "sig_c2"},
+    }
+    temp_eve.write_text(json.dumps(event) + "\n", encoding="utf-8")
+    main.ingest_eve(temp_eve)
+
+    res = c.get("/api/alerts")
+    assert res.status_code == 200
+    body = res.json()
+    assert body["total"] == 1
+    assert len(body["items"]) == 1
+    assert body["items"][0]["category"] == "c2_beacon"
+    assert body["items"][0]["playbook"] is None
+
+    res_detail = c.get(f"/api/alerts/{body['items'][0]['id']}")
+    assert res_detail.status_code == 200
+    detail = res_detail.json()
+    assert detail["category"] == "c2_beacon"
+    assert detail["playbook"] is None
