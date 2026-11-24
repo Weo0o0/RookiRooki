@@ -27,3 +27,22 @@ def test_json_masking(tmp_path):
     rows, _ = parse_eve(p)
     assert rows[0]["signature"] == '{"password": "[MASKED]"}'
     assert rows[0]["pii_masked"] == 1
+
+def test_status_rules_and_numeric_sid_and_bad_nested_fields(tmp_path):
+    p = tmp_path / "eve.json"
+    events = [
+        {"event_type":"alert", "flow_id":1, "tx_id":1, "alert":{"signature_id":"1000001","signature":"s"}, "http": "bad"},
+        {"event_type":"http", "flow_id":1, "tx_id":1, "http":{"status":404}},
+        {"event_type":"alert", "flow_id":2, "alert":{"signature_id":1000003,"signature":"b"}},
+        {"event_type":"alert", "flow_id":3, "alert":{"signature_id":1000004,"signature":"p"}},
+        {"event_type":"http", "flow_id":2, "http":{"status":200}},
+        {"event_type":"http", "flow_id":3, "http":{"status":200}},
+    ]
+    p.write_text("\n".join(json.dumps(x) for x in events))
+    rows, _ = parse_eve(p)
+    assert [(row["severity"], row["is_confirmed_risk"]) for row in rows] == [("SEV3", 0), ("SEV2", 0), ("SEV3", 0)]
+
+def test_query_masking(tmp_path):
+    p = tmp_path / "eve.json"
+    write(p, [{"event_type":"alert", "http":{"url":"/login?user=a&password=abc&token=xyz"}, "alert":{"signature_id":1000001,"signature":"s"}}])
+    assert parse_eve(p)[0][0]["raw_url"] == "/login?user=a&password=[MASKED]&token=[MASKED]"

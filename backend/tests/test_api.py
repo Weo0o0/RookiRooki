@@ -30,3 +30,25 @@ def test_suricata_errors_are_safe(monkeypatch, tmp_path):
     c = client(monkeypatch, tmp_path)
     monkeypatch.setattr(main.subprocess, "run", lambda *a, **k: (_ for _ in ()).throw(FileNotFoundError()))
     assert c.post("/api/pcap/upload", files={"file": ("x.pcap", b"x")}).status_code == 503
+
+def test_missing_rules_timeout_and_nonzero_are_safe(monkeypatch, tmp_path):
+    c = client(monkeypatch, tmp_path)
+    (tmp_path / "rules").unlink()
+    assert c.post("/api/pcap/upload", files={"file": ("x.pcap", b"x")}).status_code == 500
+    (tmp_path / "rules").write_text("rules")
+    monkeypatch.setattr(main.subprocess, "run", lambda *a, **k: (_ for _ in ()).throw(subprocess.TimeoutExpired(a[0], 1)))
+    assert c.post("/api/pcap/upload", files={"file": ("x.pcap", b"x")}).status_code == 504
+    monkeypatch.setattr(main.subprocess, "run", lambda *a, **k: subprocess.CompletedProcess(a[0], 7, "", "boom /etc/secret/path"))
+    response = c.post("/api/pcap/upload", files={"file": ("x.pcap", b"x")})
+    assert response.status_code == 502 and "boom" not in response.text and "/etc" not in response.text
+
+def test_subprocess_options_and_missing_eve_are_safe(monkeypatch, tmp_path):
+    c = client(monkeypatch, tmp_path)
+    seen = {}
+    def run(args, **kwargs):
+        seen.update(kwargs)
+        return subprocess.CompletedProcess(args, 0, "", "")
+    monkeypatch.setattr(main.subprocess, "run", run)
+    response = c.post("/api/pcap/upload", files={"file": ("x.pcap", b"x")})
+    assert response.status_code == 200 and response.json()["alerts_stored"] == 0 and response.json()["skipped_lines"] == 0
+    assert "shell" not in seen and seen["timeout"] == 120

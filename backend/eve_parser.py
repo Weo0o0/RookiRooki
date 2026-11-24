@@ -20,8 +20,10 @@ def _events_match(alert, http):
     atx, htx = alert.get("tx_id"), http.get("tx_id")
     if atx is not None and htx is not None:
         return atx == htx
-    if alert.get("http", {}).get("url") and http.get("http", {}).get("url"):
-        return alert["http"]["url"] == http["http"]["url"]
+    alert_http = alert.get("http") if isinstance(alert.get("http"), dict) else {}
+    http_http = http.get("http") if isinstance(http.get("http"), dict) else {}
+    if alert_http.get("url") and http_http.get("url"):
+        return alert_http["url"] == http_http["url"]
     return False
 
 def parse_eve(path):
@@ -38,7 +40,17 @@ def parse_eve(path):
                     events.append(item)
             except json.JSONDecodeError:
                 skipped += 1
-    alerts = [e for e in events if e.get("event_type") == "alert" and e.get("alert", {}).get("signature_id") in CATEGORIES]
+    alerts = []
+    for event in events:
+        alert = event.get("alert") if isinstance(event.get("alert"), dict) else {}
+        try:
+            sid = int(alert.get("signature_id"))
+        except (TypeError, ValueError):
+            sid = None
+        if event.get("event_type") == "alert" and sid in CATEGORIES:
+            event["alert"] = alert
+            alert["signature_id"] = sid
+            alerts.append(event)
     https = [e for e in events if e.get("event_type") == "http"]
     rows = []
     for event in alerts:
@@ -46,13 +58,16 @@ def parse_eve(path):
         sid = alert.get("signature_id")
         category, base, mitre = CATEGORIES[sid]
         candidates = [h for h in https if _events_match(event, h)]
-        if not candidates and event.get("flow_id") is not None and event.get("tx_id") is None and not event.get("http", {}).get("url"):
+        event_http = event.get("http") if isinstance(event.get("http"), dict) else {}
+        if not candidates and event.get("flow_id") is not None and event.get("tx_id") is None and not event_http.get("url"):
             flow_events = [h for h in https if h.get("flow_id") == event.get("flow_id")]
             if len(flow_events) == 1:
                 candidates = flow_events
         http = candidates[0] if candidates else None
-        data = event.get("http", {})
+        data = event_http
         http_data = (http or {}).get("http", {})
+        if not isinstance(http_data, dict):
+            http_data = {}
         status = http_data.get("status", data.get("status"))
         url = http_data.get("url", data.get("url", ""))
         signature, m1 = mask_text(alert.get("signature", ""))

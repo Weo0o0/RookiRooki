@@ -4,6 +4,7 @@ import sqlite3
 import subprocess
 import uuid
 from contextlib import closing
+from typing import Dict, List
 from pathlib import Path
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
@@ -17,12 +18,19 @@ MAX_UPLOAD_BYTES = 20 * 1024 * 1024
 ROOT = Path(__file__).resolve().parent.parent
 app = FastAPI()
 origins = [x.strip() for x in os.getenv("ALLOWED_ORIGINS", "http://localhost:5500,http://127.0.0.1:5500").split(",") if x.strip()]
+origins = [origin for origin in origins if origin != "*"]
 app.add_middleware(CORSMiddleware, allow_origins=origins, allow_methods=["*"], allow_headers=["*"], allow_credentials=True)
 
 class UploadResult(BaseModel):
     upload_id: str
     alerts_stored: int
     skipped_lines: int
+
+class StatsResult(BaseModel):
+    total: int
+    severity_counts: Dict[str, int]
+    category_counts: Dict[str, int]
+    mitre_coverage: List[str]
 
 def config(name, default):
     return Path(os.getenv(name, str(default)))
@@ -35,10 +43,6 @@ def init_db():
     with closing(sqlite3.connect(path)) as db:
         db.execute("CREATE TABLE IF NOT EXISTS alerts (id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp TEXT NOT NULL, flow_id INTEGER, sid INTEGER, category TEXT, signature TEXT, mitre_id TEXT, src_ip TEXT, dest_ip TEXT, dest_port INTEGER, http_status INTEGER, severity TEXT, is_confirmed_risk INTEGER DEFAULT 0, pii_masked INTEGER DEFAULT 0, raw_url TEXT, verdict TEXT DEFAULT 'UNREVIEWED', observation TEXT DEFAULT '', assessment TEXT DEFAULT '', confidence TEXT DEFAULT 'MEDIUM')")
         db.commit()
-
-@app.on_event("startup")
-def startup():
-    init_db()
 
 def store(rows):
     init_db()
@@ -80,13 +84,15 @@ async def upload(file: UploadFile = File(...)):
         if result.returncode != 0:
             logging.error("Suricata failed (%s): %s", result.returncode, result.stderr)
             raise HTTPException(502, f"Suricata failed with return code {result.returncode}")
-        rows, skipped = parse_eve(outdir / "eve.json"); store(rows)
+        eve_path = outdir / "eve.json"
+        rows, skipped = parse_eve(eve_path) if eve_path.exists() else ([], 0)
+        store(rows)
         return UploadResult(upload_id=upload_id, alerts_stored=len(rows), skipped_lines=skipped)
     finally:
         if size > MAX_UPLOAD_BYTES and pcap.exists():
             pcap.unlink()
 
-@app.get("/api/stats")
+@app.get("/api/stats", response_model=StatsResult)
 def stats():
     init_db()
     with closing(sqlite3.connect(db_path())) as db:

@@ -1,5 +1,5 @@
 # Temporary test rules; replace with the rule owner's custom.rules.
-alert tcp any any -> any any (msg:"SQLi"; sid:1000001; rev:1;)
-alert tcp any any -> any any (msg:"XSS"; sid:1000002; rev:1;)
-alert tcp any any -> any any (msg:"Bruteforce"; sid:1000003; rev:1;)
-alert tcp any any -> any any (msg:"Portscan"; sid:1000004; rev:1;)
+alert http any any -> any any (msg:"SQLi"; flow:established,to_server; http.uri; content:"' OR '"; nocase; sid:1000001; rev:1;)
+alert http any any -> any any (msg:"XSS"; flow:established,to_server; http.uri; content:"<script"; nocase; sid:1000002; rev:1;)
+alert tcp any any -> any 22 (msg:"Bruteforce"; flags:S; threshold:type both, track by_src, count 5, seconds 60; sid:1000003; rev:1;)
+alert tcp any any -> any any (msg:"Portscan"; flags:S; threshold:type both, track by_src, count 20, seconds 10; sid:1000004; rev:1;)
