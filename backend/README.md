@@ -32,5 +32,6 @@ WSL에서 `uvicorn backend.main:app --port 8000`으로 실행합니다. 테스�
     - 경보 상세/목록의 `playbook` 필드는 `null` 반환
     - 통계의 `blind_rules`는 `[]` 반환 (서버 500 에러 발생 안 함)
 - **재업로드/중복 방지 (Deduplication)**:
-  - 경보 식별 고유 인덱스(`timestamp, flow_id, sid, src_ip, dest_ip, dest_port, raw_url`)를 통해 동일한 패킷/로그가 중복 업로드되거나 인제스트될 경우 중복된 경보는 무시(`INSERT OR IGNORE`)되고 `duplicates_skipped` 카운트로 반환됩니다.
+  - 1차 방어 (파일 해시 중복 방지): 동일한 PCAP 파일(동일 SHA-256 해시)이 재업로드되면 Suricata를 다시 실행하지 않고 즉시 이전 업로드의 저장 건수를 `duplicates_skipped`로, `alerts_stored=0`, `duplicate_of=<이전 upload_id>`를 반환합니다.
+  - 2차 방어 (경보 식별 고유 인덱스): Suricata 실행 시마다 `flow_id` 해시 시드가 무작위로 변경되므로 고유 인덱스(`ux_alert_identity_v2`)에서는 `flow_id`를 제외하고 `(timestamp, sid, IFNULL(src_ip,''), IFNULL(dest_ip,''), IFNULL(dest_port,-1), IFNULL(raw_url,''))`를 기준으로 `INSERT OR IGNORE` 처리하여 중복 경보가 저장되지 않도록 방지합니다.
   - 기존 구버전 DB에 이미 중복 데이터가 들어가 고유 인덱스 생성이 실패할 경우 로그 경고가 남을 수 있으며, 이 경우 `backend/data/alerts.db`를 한 번 삭제하고 다시 실행하면 인덱스가 정상 생성됩니다.
