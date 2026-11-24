@@ -13,7 +13,7 @@ flowchart TB
   subgraph Host["호스트"]
     UI["프론트엔드 index.html"]
     API["백엔드 FastAPI :8000"]
-    DB[("SQLite siem.db")]
+    DB[("SQLite backend/data/alerts.db")]
     Engine["Suricata 오프라인 suricata -r"]
     UI -->|"REST 폴링 5초"| API
     API --> DB
@@ -47,7 +47,7 @@ flowchart TB
 | Docker 브리지 + tcpdump | 실습망 브리지 | 웹과 SSH 호스트로 가는 패킷을 한 파일에 녹화 |
 | Suricata | 호스트, `suricata -r` | `custom.rules`로 pcap을 읽고 `eve.json` 생성 |
 | FastAPI | 호스트 `:8000` | 업로드·샘플 적재, 파싱, 마스킹, 격상, API |
-| SQLite | `backend/siem.db` | 경보와 트리아지 저장 |
+| SQLite | `backend/data/alerts.db` (테이블 `alerts`) | 경보와 트리아지 저장 |
 | 대시보드 | 호스트 브라우저 | 경보 목록, 플레이북, 트리아지, 커버리지 |
 
 ## 2. 실습망
