@@ -1,0 +1,9 @@
+# Mini-SIEM custom rules (team 04) - SID 1000001-1000999
+# 1000001 sqli
+alert http any any -> $HOME_NET any (msg:"MINI-SIEM SQLi attempt in HTTP URI"; flow:established,to_server; http.uri; pcre:"/[\x27\x22][\s+]*(?:or|and|\|\|)[\s+(\/]|[\x27\x22][\s+]*(?:--|#|\/\*)|union(?:[\s+]|\/\*.*?\*\/)+(?:all(?:[\s+]|\/\*.*?\*\/)+)?select/i"; classtype:web-application-attack; sid:1000001; rev:1; metadata:mini_siem_category sqli, mitre_technique T1190;)
+# 1000002 xss
+alert http any any -> $HOME_NET any (msg:"MINI-SIEM XSS attempt in HTTP URI"; flow:established,to_server; http.uri; pcre:"/<[\s\/]*(?:script|iframe|svg|img|body|object|embed)\b|[\s\x22\x27\/]on[a-z]{3,20}[\s+]*=|javascript[\s+]*:/i"; classtype:web-application-attack; sid:1000002; rev:1; metadata:mini_siem_category xss, mitre_technique T1189;)
+# 1000003 bruteforce
+alert tcp any any -> 172.28.0.11 22 (msg:"MINI-SIEM SSH brute force - repeated connections to victim-pc:22"; flow:to_server; flags:S,12; threshold:type both, track by_src, count 4, seconds 60; classtype:attempted-user; sid:1000003; rev:2; metadata:mini_siem_category bruteforce, mitre_technique T1110.001;)
+# 1000004 portscan
+alert tcp any any -> $HOME_NET ![22,80] (msg:"MINI-SIEM Port scan - many SYNs to non-service ports"; flow:to_server; flags:S,12; threshold:type both, track by_src, count 20, seconds 10; classtype:network-scan; sid:1000004; rev:2; metadata:mini_siem_category portscan, mitre_technique T1046;)

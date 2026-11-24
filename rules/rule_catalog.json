@@ -1,0 +1,72 @@
+[
+  {
+    "sid": 1000001,
+    "category": "sqli",
+    "title": "SQL Injection attempt in HTTP URI",
+    "status": "testing",
+    "mitre_tactic": "Initial Access",
+    "mitre_id": "T1190",
+    "base_severity": "SEV3",
+    "escalated_severity": "SEV1",
+    "data_sources": ["suricata_alert", "suricata_http"],
+    "false_positives": [
+      "자유 입력값에 따옴표 뒤 -- 가 오는 일반 문장 (예: 'hi' -- bob)",
+      "검색어에 'union select' 단어가 그대로 포함된 경우",
+      "팀원이 허가받고 실행하는 보안 스캐너 트래픽"
+    ],
+    "validation_pcap": "scenarios/lab/pcaps/lab_capture.pcap",
+    "notes": "http.uri(URL 디코딩된 값) 검사. 대응하는 우회: 대소문자 혼용, URL 인코딩, + 공백, /**/ 주석. 미대응: 따옴표 없는 숫자형 인젝션, POST 바디(별도 SID 필요 - 백엔드·PM 합의 TODO). 2026-11-24 검증(lab_capture.pcap, my_capture.pcap): 공격 1건 탐지(HTTP 200, tx_id 있음), 정상 요청 3건(정상 로그인 200, 실패 로그인 403, 가짜 password 파라미터 403) 미탐지 -> 정탐 1/1, 오탐 0/3. 같은 트랜잭션의 http.status가 200일 때만 SEV1."
+  },
+  {
+    "sid": 1000002,
+    "category": "xss",
+    "title": "XSS attempt in HTTP URI",
+    "status": "testing",
+    "mitre_tactic": "Initial Access",
+    "mitre_id": "T1189",
+    "base_severity": "SEV3",
+    "escalated_severity": "SEV1",
+    "data_sources": ["suricata_alert", "suricata_http"],
+    "false_positives": [
+      "사용자가 HTML 코드 조각을 그대로 검색하는 경우 (개발자 커뮤니티 등)",
+      "보안 교육 자료처럼 '<script' 문자열을 포함한 검색"
+    ],
+    "validation_pcap": "scenarios/lab/pcaps/lab_capture.pcap",
+    "notes": "위험 태그(<script, <img, <svg 등), 이벤트 핸들러(on*=, 앞에 공백·따옴표·/ 필요), javascript: 를 검사. MITRE에 XSS 전용 기법이 없어 T1189를 가장 가까운 기법으로 매핑. 실습 앱 /search는 항상 200을 반환하므로 탐지 시 사실상 항상 SEV1이 됨 - 반사형 XSS에서 200은 실행 증거가 아님(PM 공유 필요). 미대응: HTML 엔티티 난독화(jav&#x61;script:). 2026-11-24 검증(lab_capture.pcap, my_capture.pcap): 공격 1건 탐지. 녹화본에 정상 /search 요청이 없어 오탐률 미측정 - 정상 검색 트래픽 녹화 요청(TODO)."
+  },
+  {
+    "sid": 1000003,
+    "category": "bruteforce",
+    "title": "SSH brute force - repeated connections to victim-pc:22",
+    "status": "testing",
+    "mitre_tactic": "Credential Access",
+    "mitre_id": "T1110.001",
+    "base_severity": "SEV2",
+    "escalated_severity": null,
+    "data_sources": ["suricata_alert"],
+    "false_positives": [
+      "관리자가 1분 안에 SSH 창을 여러 개 여는 경우",
+      "scp/rsync를 연달아 실행하는 경우",
+      "Ansible 등 자동화 도구의 반복 접속"
+    ],
+    "validation_pcap": "scenarios/lab/pcaps/lab_capture.pcap",
+    "notes": "SSH는 암호화되어 페이로드 대신 새 연결(SYN) 횟수로 탐지. threshold type both, track by_src, count 4 / 60초(60초당 경보 1회). 임계치 근거: hydra(-t 4, 비밀번호 8개)가 SYN 5개를 약 7초 안에 보냄, 정상 SSH 로그인은 SYN 1개. 미대응: 60초 이상 간격의 저속 대입 -> auth.log 상관분석 필요(Backlog). 2026-11-24 검증(lab_capture.pcap, my_capture.pcap): 각 1건 탐지."
+  },
+  {
+    "sid": 1000004,
+    "category": "portscan",
+    "title": "Port scan - many SYNs to non-service ports",
+    "status": "testing",
+    "mitre_tactic": "Discovery",
+    "mitre_id": "T1046",
+    "base_severity": "SEV3",
+    "escalated_severity": null,
+    "data_sources": ["suricata_alert"],
+    "false_positives": [
+      "실습망에 서비스 포트를 추가했는데 룰의 제외 목록(22,80)을 갱신하지 않은 경우",
+      "내부 모니터링 도구의 다중 포트 헬스 체크"
+    ],
+    "validation_pcap": "scenarios/lab/pcaps/lab_capture.pcap",
+    "notes": "Suricata threshold는 '서로 다른 포트 수'를 세지 못하므로, hydra의 22번 반복과 겹치지 않게 실습망 서비스 포트(22,80)를 제외한 포트로 가는 SYN을 출발지 기준으로 집계. count 20 / 10초. 임계치 근거: nmap -sS 1-100 x 2대 -> SYN 196개 / 0.11초, 정상 트래픽은 0개. 경보의 dest_ip/dest_port는 임계치를 넘긴 패킷의 값(예: 172.28.0.10:78)이라 대표값이 아님 - 플레이북 {{DEST_PORT}} 사용 주의(시나리오·백엔드 공유). 미대응: 저속 스캔(-T1 등), 22/80만 노린 스캔, FIN/NULL/XMAS 스캔. 2026-11-24 검증(lab_capture.pcap, my_capture.pcap): 각 1건 탐지."
+  }
+]

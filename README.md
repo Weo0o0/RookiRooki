@@ -2,7 +2,7 @@
 
 SK쉴더스 루키즈 07기 미니프로젝트 04조가, 팀 전용 Docker 실습망에서 녹화한 패킷을 Suricata로 분석하고 웹 대시보드에서 경보를 확인하는 경량 SIEM입니다.
 
-이 문서는 GitHub 저장소 [Weo0o0/RookiRooki](https://github.com/Weo0o0/RookiRooki)의 설계·계약 문서입니다. **애플리케이션 코드는 아직 구현 전**이며, 아래 실행 명령은 구현 후 사용할 표준 절차입니다. 시스템 배치와 탐지 흐름의 상세는 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)를, 팀 협업 규칙과 역할별 AI 프롬프트는 [AI_COLLABORATION_GUIDE.md](AI_COLLABORATION_GUIDE.md)를 참고하세요.
+이 문서는 GitHub 저장소 [Weo0o0/RookiRooki](https://github.com/Weo0o0/RookiRooki)의 설계·계약 문서입니다. 백엔드 핵심 코드는 main에 구현되어 있으며, 아래 실행 명령은 표준 실행 절차입니다. 시스템 배치와 탐지 흐름의 상세는 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)를, 팀 협업 규칙과 역할별 AI 프롬프트는 [ai-guides/mini_siem_ai.md](ai-guides/mini_siem_ai.md)를 참고하세요.
 
 ## 팀 구성과 역할
 
@@ -11,7 +11,7 @@ SK쉴더스 루키즈 07기 미니프로젝트 04조가, 팀 전용 Docker 실�
 | 백엔드 | FastAPI, SQLite, eve.json 파싱, 상관분석, API | `backend/` (`rules/`, `scenarios/` 파일은 읽기 전용으로 참조) |
 | 프론트엔드 | 단일 HTML SOC 대시보드 | `frontend/` |
 | 룰 | Suricata 커스텀 룰과 메타데이터 카탈로그 | `rules/custom.rules`, `rules/rule_catalog.json` |
-| 시나리오 | 실습 트래픽·pcap, 샘플 eve 로그, 대응 플레이북 | `scenarios/pcaps/`, `scenarios/sample_eve.json`, `scenarios/playbooks.json` |
+| 시나리오 | 실습 트래픽·pcap, 샘플 eve 로그, 대응 플레이북 | `scenarios/lab/pcaps/`, `scenarios/sample_eve.json`, `scenarios/playbooks.json` |
 | PM | 심각도·SLA 정책, 통합 스펙, QA, 발표 | `policies/sev_sla_policy.json`, `policies/PROJECT_SPEC_QA.md` |
 
 기술 스택은 고정입니다. 백엔드는 Python FastAPI + 내장 SQLite(`sqlite3`) + Pydantic v2이며, ORM이나 외부 DB로 바꾸지 않습니다. 프론트엔드는 단일 HTML + Tailwind CSS CDN + Vanilla JS(+ 필요 시 Chart.js CDN)이며, React/TypeScript/Webpack으로 바꾸지 않습니다. 백엔드 API는 `http://localhost:8000`에서 제공하고, 대시보드는 5초 주기 폴링(`GET /api/alerts`)과 Mock/Live 토글을 사용합니다.
@@ -48,7 +48,7 @@ Stage 1에서 다루는 시나리오는 **아래 4종뿐입니다.** MITRE 기�
 
 | 문서 | 고쳐야 할 항목 |
 |---|---|
-| `AI_COLLABORATION_GUIDE.md` | 전원 필수 규칙의 카테고리 키 목록 |
+| `ai-guides/` | 전원 필수 규칙의 카테고리 키 목록 |
 | 백엔드 역할 프롬프트 | 고정 규격의 `category` 키 (`sqli`, `ssrf`, `c2_beacon`) |
 | 룰 역할 프롬프트 | 작업 규격의 카테고리 키 |
 | 시나리오 역할 프롬프트 | 카테고리 키와 SID 매핑 (`ssrf` 1000002, `c2_beacon` 1000003) |
@@ -97,47 +97,54 @@ Stage 1에서 프론트·백엔드가 맞출 인터페이스입니다. 앞의 �
 
 ```text
 mini-siem/
-├── backend/                      # 백엔드
+├── backend/                      # 백엔드 (FastAPI, SQLite, 파서)
 │   ├── main.py
-│   └── requirements.txt
-├── frontend/
-│   └── index.html
-├── rules/
+│   ├── eve_parser.py
+│   ├── requirements.txt
+│   └── tests/
+├── frontend/                     # 프론트엔드 (단일 HTML SOC 대시보드 예정)
+│   └── README.md                 # index.html 구현 예정 안내
+├── rules/                        # Suricata 커스텀 룰 및 카탈로그
 │   ├── custom.rules
 │   └── rule_catalog.json
-├── scenarios/
-│   ├── pcaps/
-│   ├── sample_eve.json
-│   └── playbooks.json
-├── policies/
-│   ├── sev_sla_policy.json
-│   └── PROJECT_SPEC_QA.md
-├── docs/
-│   └── ARCHITECTURE.md
-├── AI_COLLABORATION_GUIDE.md
+├── scenarios/                    # 시나리오 및 실습 환경
+│   ├── lab/                      # Docker 실습망 구성
+│   │   ├── docker-compose.yml
+│   │   └── pcaps/                # 실습 녹화 pcap 저장 위치
+│   ├── sample_eve.json           # 데모용 샘플 eve 로그
+│   └── playbooks.json            # 시나리오별 대응 플레이북
+├── policies/                     # 정책 및 QA (PM 소유)
+│   └── README.md                 # sev_sla_policy.json, PROJECT_SPEC_QA.md 작성 예정 안내
+├── docs/                         # 설계 및 연동 가이드
+│   ├── ARCHITECTURE.md
+│   ├── sample_eve_guide.md
+│   └── playbooks_guide.md
+├── ai-guides/                    # 역할별 AI 프롬프트 및 가이드
+│   ├── mini_siem_ai.md
+│   └── ...
 └── README.md
 ```
 
-## 실행 방법 (구현 후 예정)
+## 실행 방법
 
-아래는 코드가 준비된 뒤에 쓰는 표준 절차입니다. 지금은 설계만 확정된 상태이므로, 명령을 그대로 실행해도 서버가 뜨지 않을 수 있습니다.
+아래는 표준 실행 절차입니다. 백엔드는 이미 구현되어 로컬에서 바로 실행할 수 있습니다.
 
 1. **실습망과 녹화 (시나리오 담당, 격리망 전용)**  
    팀 Docker 실습망(`mini-siem-net`)을 띄운 뒤, **Docker 브리지 인터페이스**에서 `victim-web`과 `victim-pc` 트래픽이 모두 보이도록 tcpdump로 pcap을 남깁니다. 브리지 이름은 환경마다 다르므로 `docker network inspect`로 확인합니다.
    ```bash
-   sudo tcpdump -i <브리지_인터페이스> -w scenarios/pcaps/lab_capture.pcap
+   sudo tcpdump -i <브리지_인터페이스> -w scenarios/lab/pcaps/lab_capture.pcap
    ```
 2. **오프라인 룰 검사 (룰·백엔드 점검용)**  
    ```bash
    mkdir -p /tmp/suricata_out
-   suricata -r scenarios/pcaps/lab_capture.pcap -S rules/custom.rules -l /tmp/suricata_out
+   suricata -r scenarios/lab/pcaps/lab_capture.pcap -S rules/custom.rules -l /tmp/suricata_out
    ```
 3. **백엔드**  
    ```bash
    pip install -r backend/requirements.txt
    uvicorn backend.main:app --reload --port 8000
    ```
-   API 문서는 구현 후 `http://localhost:8000/docs`에서 확인합니다. 샘플 로그는 `POST /api/ingest/sample`, 녹화 파일은 `POST /api/pcap/upload`로 넣습니다.
+   API 문서는 `http://localhost:8000/docs`에서 확인합니다. 샘플 로그는 `POST /api/ingest/sample`, 녹화 파일은 `POST /api/pcap/upload`로 넣습니다.
 4. **대시보드**  
    `frontend/index.html`을 열고, 백엔드가 준비되면 Mock 모드를 끄고 Live API(`http://localhost:8000`)에 연결합니다.
 
