@@ -42,7 +42,7 @@ flowchart TB
 | 구성 | 위치 | 책임 |
 |---|---|---|
 | 공격자 컨테이너 | `172.28.0.100` | 실습망 안에서만 6종 시나리오 트래픽을 발생 |
-| victim-web | `172.28.0.10` | 웹 타깃 (SQL 인젝션, XSS) |
+| victim-web | `172.28.0.10` | 웹 타깃 (SQL 인젝션, XSS, SSRF(/fetch), C2 비콘 수신 8443/tcp) |
 | victim-pc | `172.28.0.11` | SSH 타깃 (22/tcp). 포트 스캔 대상이 될 수 있음 |
 | Docker 브리지 + tcpdump | 실습망 브리지 | 웹과 SSH 호스트로 가는 패킷을 한 파일에 녹화 |
 | Suricata | 호스트, `suricata -r` | `custom.rules`로 pcap을 읽고 `eve.json` 생성 |
@@ -113,13 +113,13 @@ sequenceDiagram
 | `xss` / 1000002 | HTTP URI 또는 바디에서 스크립트 삽입으로 보이는 패턴 | `alert` + 해당 요청의 `http` | 정상 문서의 코드 예시, 인코딩 우회. 격상 조건은 SQL 인젝션과 동일 |
 | `bruteforce` / 1000003 | 짧은 시간 창에서 한 출발지가 `172.28.0.11:22`로 연결을 임계치 이상 반복 | 22/tcp 연결·세션 횟수 (`flow` 또는 threshold 룰). **페이로드는 암호화되어 비밀번호를 보지 않음** | 정상 재시도, 모니터링 점검. HTTP 200 격상 없음 |
 | `portscan` / 1000004 | 짧은 시간 창에서 한 출발지가 서로 다른 목적 포트로 SYN을 다수 전송. 목적지 22·80 제외, 샘플은 8080 사용, 룰 `![22,80]` 유지 (2026-11-24 결정 A) | 포트가 다른 SYN·연결 시도의 집계 | 정상 다중 포트 접속. HTTP 200 격상 없음 |
-| `c2_beacon` / 1000005 | 실습망 내부 반복 연결 횟수 임계치(threshold 기반). 방향·횟수·시간 창·포트는 TBD (PM 확인 필요) | 연결 횟수 집계 (`alert` 등) | 정상 주기적 폴링. HTTP 200 격상 없음 |
-| `ssrf` / 1000006 | 내부 자원 조회를 유도하는 HTTP 요청 패턴. URI 경로는 TBD (PM 확인 필요) | `alert` + 해당 요청의 `http`(상태 코드, URL) | 정상 내부 링크 참조. 응답 200일 때 SEV1 격상 (sqli/xss와 동일) |
+| `c2_beacon` / 1000005 | 실습망 내부 반복 연결 횟수 임계치(threshold 기반). attacker 172.28.0.100에서 victim-web 172.28.0.10:8443/tcp로 가며, 같은 출발지가 30초 안에 5회 연결하면 경보 1회(공격자가 트래픽을 발생시키는 구조 유지) | 연결 횟수 집계 (`alert` 등) | 정상 주기적 폴링. HTTP 200 격상 없음 |
+| `ssrf` / 1000006 | 내부 자원 조회를 유도하는 HTTP 요청 패턴. victim-web:80에 GET `/fetch?url=<내부 주소>` 요청 | `alert` + 해당 요청의 `http`(상태 코드, URL) | 정상 내부 링크 참조. 응답 200일 때 SEV1 격상 (sqli/xss와 동일) |
 
 격상 규칙을 다시 적으면 다음과 같습니다.
 
-- SQL 인젝션·XSS·SSRF: `alert`를 **그 공격 요청의** `http` 응답과 맞춥니다. 식별은 `flow_id`를 쓰되, 한 연결에 요청이 여러 개이면 URL 또는 HTTP 트랜잭션까지 같아야 합니다. 그 응답이 200이면 `severity=SEV1`, `is_confirmed_risk=1`. 403/404 등이면 카탈로그의 `base_severity`(sqli/xss는 SEV3, ssrf는 TBD)를 유지합니다.
-- SSH 무차별 대입·포트 스캔·C2 비콘: HTTP 격상을 적용하지 않고 `base_severity`(bruteforce SEV2, portscan SEV3, c2_beacon 가안 SEV2)를 유지합니다.
+- SQL 인젝션·XSS·SSRF: `alert`를 **그 공격 요청의** `http` 응답과 맞춥니다. 식별은 `flow_id`를 쓰되, 한 연결에 요청이 여러 개이면 URL 또는 HTTP 트랜잭션까지 같아야 합니다. 그 응답이 200이면 `severity=SEV1`, `is_confirmed_risk=1`. SQL 인젝션·XSS는 403/404 등이면 카탈로그의 `base_severity`(SEV3)를 유지합니다. SSRF는 403이면 경보만 내고 격상하지 않으며(내부 대상이 접속을 거절한 것이지 방어 차단이 아님) 기본 SEV3를 유지하고, 404 동작은 TBD입니다.
+- SSH 무차별 대입·포트 스캔·C2 비콘: HTTP 격상을 적용하지 않고 `base_severity`(bruteforce SEV2, portscan SEV3, c2_beacon SEV2)를 유지합니다.
 - 저장 전에 URL·로그의 평문 민감값을 `[MASKED]`로 바꿉니다. `pii_masked`를 표시하고, 정책상 최소 SEV2 검토 대상인지 PM 기준을 따릅니다.
 
 `sample_eve.json`은 Suricata NDJSON 형식이며, 웹 시나리오는 같은 요청을 가리키는 `http`와 `alert`를 짝으로 넣습니다. 200 격상 사례와 403/404 시도 사례를 모두 포함하고, 마스킹 시험용 가짜 `password=` 또는 `token=`을 최소 한 건 넣습니다.
