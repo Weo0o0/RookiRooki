@@ -400,7 +400,8 @@ def test_alert_detail_playbook_analysis_normalization(monkeypatch, tmp_path):
             "verify": "true",
             "analysis": [
                 {
-                    "title": "mask_test",
+                    "title": "check password=secret123",
+                    "where": "host token=tok456",
                     "command": "curl http://test?password=secret123&token=tok456",
                     "tokens": [
                         {"token": "password=secret123", "desc": "admin password=secret123"},
@@ -424,4 +425,24 @@ def test_alert_detail_playbook_analysis_normalization(monkeypatch, tmp_path):
     assert analysis_mask["tokens"][0]["token"] == "password=[MASKED]"
     assert "password=[MASKED]" in analysis_mask["tokens"][0]["desc"]
     assert "secret123" not in analysis_mask["tokens"][0]["desc"]
+    assert analysis_mask["title"] == "check password=[MASKED]"
+    assert analysis_mask["where"] == "host token=[MASKED]"
+    assert "secret123" not in analysis_mask["title"]
+    assert "tok456" not in analysis_mask["where"]
+
+
+def test_alert_detail_analysis_non_list_becomes_empty(monkeypatch, tmp_path):
+    c = make_client(monkeypatch, tmp_path)
+    c.post("/api/ingest/sample")
+
+    for raw in ("not-a-list", {"title": "x", "command": "echo 1", "tokens": []}):
+        custom = {"sqli": {"verify": "true", "analysis": raw}}
+        pb_file = tmp_path / "nonlist_playbooks.json"
+        pb_file.write_text(json.dumps(custom), encoding="utf-8")
+        monkeypatch.setenv("PLAYBOOKS_PATH", str(pb_file))
+        res = c.get("/api/alerts/1")
+        assert res.status_code == 200
+        pb = res.json()["playbook"]
+        assert pb is not None
+        assert pb["analysis"] == []
 

@@ -239,9 +239,11 @@ def build_alert_dict(row, playbooks: Dict[str, Any]) -> Dict[str, Any]:
                         "token": masked_tok,
                         "desc": masked_desc,
                     })
+                masked_title, _ = mask_text(str(item.get("title", "") or ""))
+                masked_where, _ = mask_text(str(item.get("where", "") or ""))
                 normalized_analysis.append({
-                    "title": str(item.get("title", "") or ""),
-                    "where": str(item.get("where", "") or ""),
+                    "title": masked_title,
+                    "where": masked_where,
                     "command": masked_cmd,
                     "tokens": norm_tokens,
                 })
