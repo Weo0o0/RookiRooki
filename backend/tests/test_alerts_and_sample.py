@@ -297,3 +297,22 @@ def test_stats_blind_rules(monkeypatch, tmp_path):
     assert malformed_stats["blind_rules"][0]["category"] == ""
     assert malformed_stats["blind_rules"][0]["title"] == ""
     assert malformed_stats["blind_rules"][0]["missing_sources"] == ["suricata_missing"]
+
+def test_stats_category_counts_and_mitre_coverage_c2_and_ssrf(monkeypatch, tmp_path):
+    c = make_client(monkeypatch, tmp_path)
+    temp_eve = tmp_path / "temp_eve.json"
+    events = [
+        {"event_type": "alert", "timestamp": "2026-11-24T00:00:01.000000+0000", "flow_id": 10, "alert": {"signature_id": 1000005, "signature": "sig_c2"}},
+        {"event_type": "alert", "timestamp": "2026-11-24T00:00:02.000000+0000", "flow_id": 20, "alert": {"signature_id": 1000006, "signature": "sig_ssrf"}},
+    ]
+    temp_eve.write_text("\n".join(json.dumps(x) for x in events), encoding="utf-8")
+    main.ingest_eve(temp_eve)
+
+    res = c.get("/api/stats")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["total"] == 2
+    assert data["category_counts"].get("c2_beacon") == 1
+    assert data["category_counts"].get("ssrf") == 1
+    assert "T1071.001" in data["mitre_coverage"]
+    assert "T1190" in data["mitre_coverage"]

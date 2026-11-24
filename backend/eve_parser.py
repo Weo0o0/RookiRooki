@@ -1,7 +1,14 @@
 import json
 import re
 
-CATEGORIES = {1000001: ("sqli", "SEV3", "T1190"), 1000002: ("xss", "SEV3", "T1189"), 1000003: ("bruteforce", "SEV2", "T1110.001"), 1000004: ("portscan", "SEV3", "T1046")}
+CATEGORIES = {
+    1000001: ("sqli", "SEV3", "T1190"),
+    1000002: ("xss", "SEV3", "T1189"),
+    1000003: ("bruteforce", "SEV2", "T1110.001"),
+    1000004: ("portscan", "SEV3", "T1046"),
+    1000005: ("c2_beacon", "SEV2", "T1071.001"),
+    1000006: ("ssrf", "SEV3", "T1190"),
+}
 MASKED_KEYS = r"password|passwd|pwd|token|secret"
 
 def mask_text(value):
@@ -86,11 +93,11 @@ def parse_eve(path):
         if not isinstance(http_data, dict):
             http_data = {}
         status = http_data.get("status", data.get("status"))
-        if category not in ("sqli", "xss"):
+        if category not in ("sqli", "xss", "ssrf"):
             status = None  # http_status is only for web attacks (ARCHITECTURE.md)
         url = http_data.get("url", data.get("url", ""))
         signature, m1 = mask_text(alert.get("signature", ""))
         raw_url, m2 = mask_text(url)
-        severity = "SEV1" if category in ("sqli", "xss") and status == 200 else base
+        severity = "SEV1" if category in ("sqli", "xss", "ssrf") and status == 200 else base
         rows.append({"timestamp": event.get("timestamp", ""), "flow_id": event.get("flow_id"), "sid": sid, "category": category, "signature": signature, "mitre_id": mitre, "src_ip": event.get("src_ip"), "dest_ip": event.get("dest_ip"), "dest_port": event.get("dest_port"), "http_status": status, "severity": severity, "is_confirmed_risk": int(severity == "SEV1"), "pii_masked": int(m1 or m2), "raw_url": raw_url})
     return rows, skipped
