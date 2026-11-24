@@ -1,0 +1,6 @@
+{"event_type":"alert","timestamp":"2023-01-01T00:00:01.000000+0000","flow_id":100,"tx_id":1,"src_ip":"192.168.1.10","dest_ip":"192.168.1.20","dest_port":80,"alert":{"signature_id":1000001,"signature":"SQL Injection Attempt password=admin"}}
+{"event_type":"http","timestamp":"2023-01-01T00:00:01.000000+0000","flow_id":100,"tx_id":1,"src_ip":"192.168.1.10","dest_ip":"192.168.1.20","dest_port":80,"http":{"status":200,"url":"/login?user=admin&password=secret"}}
+{"event_type":"alert","timestamp":"2023-01-01T00:00:02.000000+0000","flow_id":101,"tx_id":1,"src_ip":"192.168.1.11","dest_ip":"192.168.1.20","dest_port":80,"alert":{"signature_id":1000002,"signature":"XSS Attempt"}}
+{"event_type":"http","timestamp":"2023-01-01T00:00:02.000000+0000","flow_id":101,"tx_id":1,"src_ip":"192.168.1.11","dest_ip":"192.168.1.20","dest_port":80,"http":{"status":404,"url":"/search?q=<script>"}}
+{"event_type":"alert","timestamp":"2023-01-01T00:00:03.000000+0000","flow_id":102,"src_ip":"192.168.1.12","dest_ip":"192.168.1.20","dest_port":22,"alert":{"signature_id":1000003,"signature":"SSH Brute Force"}}
+{"event_type":"alert","timestamp":"2023-01-01T00:00:04.000000+0000","flow_id":103,"src_ip":"192.168.1.13","dest_ip":"192.168.1.20","dest_port":8080,"alert":{"signature_id":1000004,"signature":"Port Scan"}}
