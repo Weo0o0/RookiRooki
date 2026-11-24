@@ -26,6 +26,23 @@ def _events_match(alert, http):
         return alert_http["url"] == http_http["url"]
     return False
 
+def extract_event_types(path):
+    types = set()
+    try:
+        with open(path, encoding="utf-8") as handle:
+            for line in handle:
+                if not line.strip():
+                    continue
+                try:
+                    item = json.loads(line)
+                    if isinstance(item, dict) and "event_type" in item:
+                        types.add(str(item["event_type"]))
+                except json.JSONDecodeError:
+                    pass
+    except FileNotFoundError:
+        pass
+    return types
+
 def parse_eve(path):
     events, skipped = [], 0
     with open(path, encoding="utf-8") as handle:
