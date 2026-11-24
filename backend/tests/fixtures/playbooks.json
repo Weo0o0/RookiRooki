@@ -5,7 +5,24 @@
     "preserve_evidence_first": true,
     "verify": "curl -i 'http://{{DEST_IP}}:{{DEST_PORT}}/test'",
     "block": "iptables -A INPUT -s {{SRC_IP}} -j DROP",
-    "rollback": "iptables -D INPUT -s {{SRC_IP}} -j DROP"
+    "rollback": "iptables -D INPUT -s {{SRC_IP}} -j DROP",
+    "analysis": [
+      {
+        "title": "웹 컨테이너 접속 로그 확인",
+        "where": "victim-web",
+        "command": "docker logs --since 5m victim-web | grep '{{SRC_IP}}'",
+        "tokens": [
+          {
+            "token": "victim-web",
+            "desc": "공격 대상 웹 애플리케이션 컨테이너 이름"
+          },
+          {
+            "token": "{{SRC_IP}}",
+            "desc": "공격자 IP 주소"
+          }
+        ]
+      }
+    ]
   },
   "xss": {
     "osi_layer": "Application",
@@ -13,7 +30,20 @@
     "preserve_evidence_first": false,
     "verify": "curl -i 'http://{{DEST_IP}}:{{DEST_PORT}}/'",
     "block": "iptables -A INPUT -s {{SRC_IP}} -j DROP",
-    "rollback": "iptables -D INPUT -s {{SRC_IP}} -j DROP"
+    "rollback": "iptables -D INPUT -s {{SRC_IP}} -j DROP",
+    "analysis": [
+      {
+        "title": "웹 접근 로그의 스크립트 태그 파라미터 검색",
+        "where": "victim-web",
+        "command": "docker logs --since 5m victim-web | grep -E '<script|alert'",
+        "tokens": [
+          {
+            "token": "victim-web",
+            "desc": "웹 서버 컨테이너"
+          }
+        ]
+      }
+    ]
   },
   "bruteforce": {
     "osi_layer": "Transport",
@@ -21,7 +51,20 @@
     "preserve_evidence_first": true,
     "verify": "lastb -a",
     "block": "iptables -A INPUT -s {{SRC_IP}} -j DROP",
-    "rollback": "iptables -D INPUT -s {{SRC_IP}} -j DROP"
+    "rollback": "iptables -D INPUT -s {{SRC_IP}} -j DROP",
+    "analysis": [
+      {
+        "title": "SSH 인증 실패 기록 확인",
+        "where": "victim-pc",
+        "command": "docker logs --since 5m victim-pc | grep 'Failed password'",
+        "tokens": [
+          {
+            "token": "victim-pc",
+            "desc": "SSH 서비스가 동작 중인 PC 컨테이너"
+          }
+        ]
+      }
+    ]
   },
   "portscan": {
     "osi_layer": "Network",

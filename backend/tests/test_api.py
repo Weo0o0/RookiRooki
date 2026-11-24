@@ -19,7 +19,7 @@ def test_upload_and_stats(monkeypatch, tmp_path):
     c = client(monkeypatch, tmp_path)
     def run(args, **kwargs):
         out = args[args.index("-l") + 1]; (tmp_path / "out" / next(iter((tmp_path / "out").iterdir())).name / "eve.json").write_text(json.dumps({"event_type":"alert","timestamp":"t","flow_id":1,"alert":{"signature_id":1000001,"signature":"ok"}}) + "\n")
-        assert args == ["suricata-test", "-r", args[2], "-S", str(tmp_path / "rules"), "-l", out, "-k", "none"] and kwargs["capture_output"] and kwargs["text"]
+        assert args == ["suricata-test", "-r", args[2], "-S", str(tmp_path / "rules"), "-l", out, "-k", "none", "--runmode", "single"] and kwargs["capture_output"] and kwargs["text"]
         return subprocess.CompletedProcess(args, 0, "", "")
     monkeypatch.setattr(main.subprocess, "run", run)
     response = c.post("/api/pcap/upload", files={"file": ("x.PCAP", b"data")})
