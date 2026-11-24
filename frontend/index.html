@@ -433,16 +433,16 @@
         timestamp: "2026-11-24T13:05:10Z",
         sid: 1000003,
         category: "bruteforce",
-        signature: "CUSTOM HTTP Login Brute Force Threshold Exceeded",
-        mitre_id: "T1110",
+        signature: "CUSTOM SSH Login Brute Force Threshold Exceeded",
+        mitre_id: "T1110.001",
         src_ip: "172.28.0.99",
-        dest_ip: "172.28.0.10",
-        dest_port: 80,
-        http_status: 401,
+        dest_ip: "172.28.0.11",
+        dest_port: 22,
+        http_status: null,
         severity: "SEV2",
         is_confirmed_risk: false,
         pii_masked: true,
-        raw_url: "/login (user=admin, pw=[MASKED])",
+        raw_url: "-",
         verdict: "UNREVIEWED",
         observation: "",
         assessment: "",
@@ -453,11 +453,11 @@
           rollback: "sudo iptables -D INPUT -s {{SRC_IP}} -p tcp --dport {{DEST_PORT}} -j DROP",
           analysis: [
             {
-              title: "로그인 실패 로그 확인",
-              where: "victim-web",
-              command: "docker logs --since 5m victim-web | grep '401' | grep '{{SRC_IP}}'",
+              title: "SSH 인증 실패 기록 확인",
+              where: "victim-pc",
+              command: "docker logs --since 5m victim-pc | grep '{{SRC_IP}}'",
               tokens: [
-                { token: "victim-web", desc: "웹 서비스 컨테이너" },
+                { token: "victim-pc", desc: "SSH 서비스(22번 포트)가 동작 중인 PC 컨테이너" },
                 { token: "{{SRC_IP}}", desc: "접속 시도자 IP" }
               ]
             }
