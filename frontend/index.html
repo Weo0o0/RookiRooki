@@ -19,11 +19,16 @@
     </div>
 
     <div class="flex flex-wrap items-center gap-3">
-      <!-- PCAP 업로드 영역 (Stage 1 필수 API: POST /api/pcap/upload) -->
+      <!-- PCAP 업로드 영역 (POST /api/pcap/upload, form 필드: file) -->
       <label class="cursor-pointer bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs px-3 py-2 rounded-lg transition">
         <span>📁 PCAP 업로드</span>
         <input type="file" id="pcapFileInput" accept=".pcap,.pcapng" class="hidden" />
       </label>
+
+      <!-- 침해사고 보고서(.md) 원클릭 다운로드 버튼 -->
+      <button id="btnExportReport" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold px-3 py-2 rounded-lg transition">
+        📄 보고서 내보내기 (.md)
+      </button>
 
       <!-- Mock / Live API 모드 토글 -->
       <div class="flex items-center bg-slate-800 rounded-lg p-1 border border-slate-700 text-xs">
@@ -33,7 +38,7 @@
     </div>
   </header>
 
-  <!-- 시스템 상태 및 에러 알림 배너 (API 실패 시 화면 멈춤 방지) -->
+  <!-- 시스템 상태 및 에러 알림 배너 -->
   <div id="statusBanner" class="bg-slate-900/80 border-b border-slate-800 px-6 py-2 text-xs text-slate-300 flex justify-between items-center">
     <span id="statusMessage">🟡 Mock 데이터 모드로 동작 중입니다. (5초 주기 폴링 대기)</span>
     <span id="lastUpdated" class="text-slate-500">마지막 갱신: -</span>
@@ -42,7 +47,7 @@
   <!-- 메인 컨테이너 -->
   <main class="p-6 max-w-[1600px] mx-auto space-y-6">
 
-    <!-- 상단 KPI 카드 + 카테고리 차트 -->
+    <!-- 상단 KPI 카드 + 6종 카테고리 차트 -->
     <section class="grid grid-cols-1 lg:grid-cols-12 gap-4">
       <div class="lg:col-span-8 grid grid-cols-2 sm:grid-cols-4 gap-4">
         <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
@@ -63,9 +68,9 @@
         </div>
       </div>
 
-      <!-- 확정 4종 카테고리 분포 차트 -->
+      <!-- 6종 공격 카테고리 분포 차트 -->
       <div class="lg:col-span-4 bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col justify-center">
-        <p class="text-xs text-slate-400 mb-2">공격 카테고리 분포 (확정 4종)</p>
+        <p class="text-xs text-slate-400 mb-2">공격 카테고리 분포 (6종 + 기타)</p>
         <div class="h-24">
           <canvas id="categoryChart"></canvas>
         </div>
@@ -79,13 +84,28 @@
       <div class="lg:col-span-7 bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
         <div class="p-4 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3">
           <h2 class="text-sm font-semibold text-slate-200">실시간 탐지 경보</h2>
-          <div class="flex gap-2 text-xs">
+          <div class="flex flex-wrap gap-2 text-xs">
+            <input
+              type="text"
+              id="searchKeyword"
+              placeholder="IP, 시그니처, URL 검색..."
+              class="bg-slate-800 border border-slate-700 rounded px-2.5 py-1 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-sky-500 w-44"
+            />
+            <select id="filterVerdict" class="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-slate-200">
+              <option value="ALL">전체 판정</option>
+              <option value="UNREVIEWED">미검토 (UNREVIEWED)</option>
+              <option value="TP">정탐 (TP)</option>
+              <option value="FP">오탐 (FP)</option>
+            </select>
+            <!-- 6종 카테고리 필터 -->
             <select id="filterCategory" class="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-slate-200">
               <option value="ALL">전체 카테고리</option>
               <option value="sqli">SQLi (1000001)</option>
               <option value="xss">XSS (1000002)</option>
               <option value="bruteforce">BruteForce (1000003)</option>
               <option value="portscan">PortScan (1000004)</option>
+              <option value="c2_beacon">C2 Beacon (1000005)</option>
+              <option value="ssrf">SSRF (1000006)</option>
             </select>
             <select id="filterSeverity" class="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-slate-200">
               <option value="ALL">전체 심각도</option>
@@ -142,7 +162,7 @@
             </div>
           </div>
 
-          <!-- 2. 트리아지(Triage) 입력 폼: 사실(Fact)과 추정(Assessment) 분리 -->
+          <!-- 2. 트리아지(Triage) 입력 폼 -->
           <div class="space-y-3 border-b border-slate-800 pb-4">
             <h4 class="text-xs font-bold uppercase tracking-wider text-sky-400">트리아지 분석 (Fact vs Assessment 분리)</h4>
 
@@ -167,7 +187,7 @@
 
             <div class="text-xs">
               <label class="block text-slate-400 mb-1">관찰된 사실 (Observation / Fact)</label>
-              <textarea id="triageObservation" rows="2" placeholder="예: 172.28.0.99에서 /login?id=' OR 1=1-- 요청 후 HTTP 200 응답 확인"
+              <textarea id="triageObservation" rows="2" placeholder="예: 172.28.0.100에서 /login?id=' OR 1=1-- 요청 후 HTTP 200 응답 확인"
                 class="w-full bg-slate-800 border border-slate-700 rounded p-2 text-white focus:outline-none focus:border-sky-500"></textarea>
             </div>
 
@@ -182,12 +202,13 @@
             </button>
           </div>
 
-          <!-- 3. 대응 플레이북 (차단 + 검증 + 롤백 세트 / 안내 전용) -->
+          <!-- 3. 대응 플레이북 (공식 actions.linux / actions.ufw 구조 · 복사 전용) -->
           <div class="space-y-2">
             <div class="flex items-center justify-between">
-              <h4 class="text-xs font-bold uppercase tracking-wider text-amber-400">대응 플레이북 (CLI 안내용)</h4>
+              <h4 id="playbookTitle" class="text-xs font-bold uppercase tracking-wider text-amber-400">대응 플레이북 (CLI 안내용)</h4>
               <span class="text-[11px] text-slate-500">자동 실행 안 함 · 복사 후 수동 적용</span>
             </div>
+            <div id="playbookEvidenceNote" class="hidden text-[11px] bg-amber-500/10 border border-amber-500/30 text-amber-200 rounded-lg p-2"></div>
             <div id="playbookContainer" class="space-y-2 text-xs">
               <!-- JS로 치환된 명령어와 복사 버튼 렌더링 -->
             </div>
@@ -205,11 +226,33 @@
     const API_BASE = "http://localhost:8000";
     let isLiveMode = false;
     let alertsData = [];
-    let selectedAlertId = null; // 숫자/문자열 ID 모두 대응하기 위해 String으로 비교
+    let selectedAlertId = null;
     let pollingTimer = null;
     let categoryChartInstance = null;
 
-    // 실습망(172.28.0.0/24) 및 확정 4종 카테고리 규격에 맞춘 Mock 데이터
+    // 6종 카테고리 기본 정의 (순서·라벨·색상)
+    const BASE_CATEGORIES = [
+      { key: "sqli", label: "SQLi", color: "#f43f5e" },
+      { key: "xss", label: "XSS", color: "#f59e0b" },
+      { key: "bruteforce", label: "BruteForce", color: "#38bdf8" },
+      { key: "portscan", label: "PortScan", color: "#a855f7" },
+      { key: "c2_beacon", label: "C2 Beacon", color: "#10b981" },
+      { key: "ssrf", label: "SSRF", color: "#ec4899" }
+    ];
+
+    // 공식 플레이북 구조 생성 헬퍼 (Mock용)
+    function makeMockPlaybook(name, blockLinux, verifyLinux, rollbackLinux, blockUfw, verifyUfw, rollbackUfw) {
+      return {
+        name,
+        preserve_evidence_first: "차단 전 관련 로그(eve.json, 웹/SSH 로그)와 패킷을 먼저 보존하세요.",
+        actions: {
+          linux: { verify: verifyLinux, block: blockLinux, rollback: rollbackLinux },
+          ufw: { verify: verifyUfw, block: blockUfw, rollback: rollbackUfw }
+        }
+      };
+    }
+
+    // 실습망(attacker 172.28.0.100, victim-web .10, victim-pc .11) 및 6종 규격 Mock 데이터
     const MOCK_ALERTS = [
       {
         id: 1,
@@ -218,7 +261,7 @@
         category: "sqli",
         signature: "CUSTOM SQLi Union/Boolean Injection Detected",
         mitre_id: "T1190",
-        src_ip: "172.28.0.99",
+        src_ip: "172.28.0.100",
         dest_ip: "172.28.0.10",
         dest_port: 80,
         http_status: 200,
@@ -230,11 +273,15 @@
         observation: "",
         assessment: "",
         confidence: "MEDIUM",
-        playbook: {
-          block: "sudo iptables -A INPUT -s {{SRC_IP}} -d {{DEST_IP}} -p tcp --dport {{DEST_PORT}} -j DROP",
-          verify: "sudo iptables -L INPUT -n -v | grep {{SRC_IP}}",
-          rollback: "sudo iptables -D INPUT -s {{SRC_IP}} -d {{DEST_IP}} -p tcp --dport {{DEST_PORT}} -j DROP"
-        }
+        playbook: makeMockPlaybook(
+          "SQL Injection 대응",
+          "sudo iptables -A INPUT -s {{SRC_IP}} -d {{DEST_IP}} -p tcp --dport {{DEST_PORT}} -j DROP",
+          "sudo iptables -L INPUT -n -v | grep {{SRC_IP}}",
+          "sudo iptables -D INPUT -s {{SRC_IP}} -d {{DEST_IP}} -p tcp --dport {{DEST_PORT}} -j DROP",
+          "sudo ufw deny from {{SRC_IP}} to {{DEST_IP}} port {{DEST_PORT}}",
+          "sudo ufw status numbered | grep {{SRC_IP}}",
+          "sudo ufw delete deny from {{SRC_IP}} to {{DEST_IP}} port {{DEST_PORT}}"
+        )
       },
       {
         id: 2,
@@ -242,49 +289,57 @@
         sid: 1000002,
         category: "xss",
         signature: "CUSTOM Reflected XSS Script Tag Attempt",
-        mitre_id: "T1059.007",
-        src_ip: "172.28.0.99",
+        mitre_id: "T1189",
+        src_ip: "172.28.0.100",
         dest_ip: "172.28.0.10",
         dest_port: 80,
         http_status: 403,
-        severity: "SEV2",
+        severity: "SEV3",
         is_confirmed_risk: false,
         pii_masked: false,
         raw_url: "/search?q=<script>alert('XSS_TEST')<\/script>",
         verdict: "TP",
-        observation: "검색 파라미터에 <script> 태그 삽입 시도, WAF/서버에서 403 차단 확인",
+        observation: "검색 파라미터에 <script> 태그 삽입 시도, 서버에서 403 차단 확인",
         assessment: "단순 반사형 XSS 스캐닝 시도로 판단됨",
         confidence: "HIGH",
-        playbook: {
-          block: "sudo ufw deny from {{SRC_IP}} to {{DEST_IP}} port {{DEST_PORT}}",
-          verify: "sudo ufw status numbered | grep {{SRC_IP}}",
-          rollback: "sudo ufw delete deny from {{SRC_IP}} to {{DEST_IP}} port {{DEST_PORT}}"
-        }
+        playbook: makeMockPlaybook(
+          "XSS 공격 대응",
+          "sudo iptables -A INPUT -s {{SRC_IP}} -d {{DEST_IP}} -p tcp --dport {{DEST_PORT}} -j DROP",
+          "sudo iptables -L INPUT -n -v | grep {{SRC_IP}}",
+          "sudo iptables -D INPUT -s {{SRC_IP}} -d {{DEST_IP}} -p tcp --dport {{DEST_PORT}} -j DROP",
+          "sudo ufw deny from {{SRC_IP}} to {{DEST_IP}} port {{DEST_PORT}}",
+          "sudo ufw status numbered | grep {{SRC_IP}}",
+          "sudo ufw delete deny from {{SRC_IP}} to {{DEST_IP}} port {{DEST_PORT}}"
+        )
       },
       {
         id: 3,
         timestamp: "2026-11-24T13:05:10Z",
         sid: 1000003,
         category: "bruteforce",
-        signature: "CUSTOM HTTP Login Brute Force Threshold Exceeded",
-        mitre_id: "T1110",
-        src_ip: "172.28.0.99",
-        dest_ip: "172.28.0.10",
-        dest_port: 80,
-        http_status: 401,
+        signature: "CUSTOM SSH Brute Force Threshold Exceeded",
+        mitre_id: "T1110.001",
+        src_ip: "172.28.0.100",
+        dest_ip: "172.28.0.11",
+        dest_port: 22,
+        http_status: null,
         severity: "SEV2",
         is_confirmed_risk: false,
-        pii_masked: true,
-        raw_url: "/login (user=admin, pw=[MASKED])",
+        pii_masked: false,
+        raw_url: "-",
         verdict: "UNREVIEWED",
         observation: "",
         assessment: "",
         confidence: "MEDIUM",
-        playbook: {
-          block: "sudo iptables -A INPUT -s {{SRC_IP}} -p tcp --dport {{DEST_PORT}} -j DROP",
-          verify: "sudo iptables -L INPUT -n --line-numbers | grep {{SRC_IP}}",
-          rollback: "sudo iptables -D INPUT -s {{SRC_IP}} -p tcp --dport {{DEST_PORT}} -j DROP"
-        }
+        playbook: makeMockPlaybook(
+          "SSH Brute Force 대응",
+          "sudo iptables -A INPUT -s {{SRC_IP}} -d {{DEST_IP}} -p tcp --dport {{DEST_PORT}} -j DROP",
+          "sudo iptables -L INPUT -n --line-numbers | grep {{SRC_IP}}",
+          "sudo iptables -D INPUT -s {{SRC_IP}} -d {{DEST_IP}} -p tcp --dport {{DEST_PORT}} -j DROP",
+          "sudo ufw deny from {{SRC_IP}} to {{DEST_IP}} port {{DEST_PORT}}",
+          "sudo ufw status numbered | grep {{SRC_IP}}",
+          "sudo ufw delete deny from {{SRC_IP}} to {{DEST_IP}} port {{DEST_PORT}}"
+        )
       },
       {
         id: 4,
@@ -293,9 +348,9 @@
         category: "portscan",
         signature: "CUSTOM Nmap SYN Port Scan Detected",
         mitre_id: "T1046",
-        src_ip: "172.28.0.99",
+        src_ip: "172.28.0.100",
         dest_ip: "172.28.0.11",
-        dest_port: 22,
+        dest_port: 445,
         http_status: null,
         severity: "SEV3",
         is_confirmed_risk: false,
@@ -305,18 +360,79 @@
         observation: "",
         assessment: "",
         confidence: "LOW",
-        playbook: {
-          block: "sudo iptables -A INPUT -s {{SRC_IP}} -d {{DEST_IP}} -j DROP",
-          verify: "sudo iptables -S INPUT | grep {{SRC_IP}}",
-          rollback: "sudo iptables -D INPUT -s {{SRC_IP}} -d {{DEST_IP}} -j DROP"
-        }
+        playbook: makeMockPlaybook(
+          "Port Scan 대응",
+          "sudo iptables -A INPUT -s {{SRC_IP}} -d {{DEST_IP}} -j DROP",
+          "sudo iptables -S INPUT | grep {{SRC_IP}}",
+          "sudo iptables -D INPUT -s {{SRC_IP}} -d {{DEST_IP}} -j DROP",
+          "sudo ufw deny from {{SRC_IP}} to {{DEST_IP}}",
+          "sudo ufw status numbered | grep {{SRC_IP}}",
+          "sudo ufw delete deny from {{SRC_IP}} to {{DEST_IP}}"
+        )
+      },
+      {
+        id: 5,
+        timestamp: "2026-11-24T13:09:05Z",
+        sid: 1000005,
+        category: "c2_beacon",
+        signature: "CUSTOM C2 Beacon Periodic Connection (Mock)",
+        mitre_id: "T1071.001",
+        src_ip: "172.28.0.100",
+        dest_ip: "172.28.0.11",
+        dest_port: 8443,
+        http_status: null,
+        severity: "SEV2",
+        is_confirmed_risk: false,
+        pii_masked: false,
+        raw_url: "-",
+        verdict: "UNREVIEWED",
+        observation: "",
+        assessment: "",
+        confidence: "MEDIUM",
+        playbook: makeMockPlaybook(
+          "C2 Beacon 대응",
+          "sudo iptables -A INPUT -s {{SRC_IP}} -d {{DEST_IP}} -p tcp --dport {{DEST_PORT}} -j DROP",
+          "sudo iptables -L INPUT -n -v | grep {{SRC_IP}}",
+          "sudo iptables -D INPUT -s {{SRC_IP}} -d {{DEST_IP}} -p tcp --dport {{DEST_PORT}} -j DROP",
+          "sudo ufw deny from {{SRC_IP}} to {{DEST_IP}} port {{DEST_PORT}}",
+          "sudo ufw status numbered | grep {{SRC_IP}}",
+          "sudo ufw delete deny from {{SRC_IP}} to {{DEST_IP}} port {{DEST_PORT}}"
+        )
+      },
+      {
+        id: 6,
+        timestamp: "2026-11-24T13:11:30Z",
+        sid: 1000006,
+        category: "ssrf",
+        signature: "CUSTOM SSRF Internal Target Request (Mock)",
+        mitre_id: "T1190",
+        src_ip: "172.28.0.100",
+        dest_ip: "172.28.0.10",
+        dest_port: 80,
+        http_status: 200,
+        severity: "SEV1",
+        is_confirmed_risk: true,
+        pii_masked: false,
+        raw_url: "/mock-ssrf-endpoint?url=http://172.28.0.11/",
+        verdict: "UNREVIEWED",
+        observation: "",
+        assessment: "",
+        confidence: "MEDIUM",
+        playbook: makeMockPlaybook(
+          "SSRF 대응",
+          "sudo iptables -A INPUT -s {{SRC_IP}} -d {{DEST_IP}} -p tcp --dport {{DEST_PORT}} -j DROP",
+          "sudo iptables -L INPUT -n -v | grep {{SRC_IP}}",
+          "sudo iptables -D INPUT -s {{SRC_IP}} -d {{DEST_IP}} -p tcp --dport {{DEST_PORT}} -j DROP",
+          "sudo ufw deny from {{SRC_IP}} to {{DEST_IP}} port {{DEST_PORT}}",
+          "sudo ufw status numbered | grep {{SRC_IP}}",
+          "sudo ufw delete deny from {{SRC_IP}} to {{DEST_IP}} port {{DEST_PORT}}"
+        )
       }
     ];
 
     // ==========================================
     // 2. 보안 유틸리티 (XSS 차단 + CLI 인젝션 방어)
     // ==========================================
-    // 모든 외부 문자열을 innerHTML에 넣기 전 반드시 이 함수를 통과시킴
     function escapeHtml(str) {
       if (str === null || str === undefined) return "";
       return String(str)
@@ -327,22 +443,18 @@
         .replace(/'/g, "&#39;");
     }
 
-    // CLI 명령어 치환 전 IP/포트 형식 검증 (셸 메타문자 인젝션 차단)
     function sanitizeCliToken(value, type) {
       const str = String(value ?? "").trim();
       if (type === "ip") {
-        // IPv4 또는 IPv6 허용 문자만 통과
         return /^[0-9a-fA-F.:]+$/.test(str) ? str : "INVALID_IP";
       }
       if (type === "port") {
-        // 1~65535 범위의 숫자 포트만 통과
         const num = Number(str);
         return Number.isInteger(num) && num >= 1 && num <= 65535 ? String(num) : "INVALID_PORT";
       }
       return "";
     }
 
-    // 플레이북 템플릿의 {{SRC_IP}}, {{DEST_IP}}, {{DEST_PORT}} 안전 치환
     function replacePlaybookVars(template, alert) {
       if (!template) return "";
       return String(template)
@@ -351,7 +463,29 @@
         .replaceAll("{{DEST_PORT}}", sanitizeCliToken(alert.dest_port, "port"));
     }
 
-    // 상태 배너 메시지 안전 업데이트
+    // 공식 플레이북 구조(actions.linux / actions.ufw)에서 명령어 추출
+    function extractPlaybookGroups(alert) {
+      const pb = alert.playbook || {};
+      const groups = [];
+      if (pb.actions?.linux) {
+        groups.push({
+          env: "Linux (iptables)",
+          verify: replacePlaybookVars(pb.actions.linux.verify, alert),
+          block: replacePlaybookVars(pb.actions.linux.block, alert),
+          rollback: replacePlaybookVars(pb.actions.linux.rollback, alert)
+        });
+      }
+      if (pb.actions?.ufw) {
+        groups.push({
+          env: "UFW",
+          verify: replacePlaybookVars(pb.actions.ufw.verify, alert),
+          block: replacePlaybookVars(pb.actions.ufw.block, alert),
+          rollback: replacePlaybookVars(pb.actions.ufw.rollback, alert)
+        });
+      }
+      return groups;
+    }
+
     function setStatus(message, isError = false) {
       const el = document.getElementById("statusMessage");
       el.textContent = message;
@@ -360,10 +494,21 @@
         "마지막 갱신: " + new Date().toLocaleTimeString("ko-KR");
     }
 
+    // 모드 전환 또는 빈 목록일 때 이전 상세·트리아지 입력 초기화
+    function clearDetailPanel() {
+      selectedAlertId = null;
+      document.getElementById("detailPanel").classList.add("hidden");
+      document.getElementById("emptyDetail").classList.remove("hidden");
+      document.getElementById("triageVerdict").value = "UNREVIEWED";
+      document.getElementById("triageConfidence").value = "MEDIUM";
+      document.getElementById("triageObservation").value = "";
+      document.getElementById("triageAssessment").value = "";
+      document.getElementById("playbookContainer").innerHTML = "";
+    }
+
     // ==========================================
     // 3. 데이터 로딩 (Mock / Live 5초 폴링)
     // ==========================================
-    // 경보 목록 및 통계 조회 (API 실패 시 try-catch로 화면 멈춤 방지)
     async function fetchDashboardData() {
       if (!isLiveMode) {
         alertsData = JSON.parse(JSON.stringify(MOCK_ALERTS));
@@ -373,18 +518,26 @@
       }
 
       try {
-        const res = await fetch(`${API_BASE}/api/alerts`);
+        const res = await fetch(`${API_BASE}/api/alerts?limit=50`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
-        alertsData = Array.isArray(data) ? data : (data.alerts || []);
+        // 백엔드 공식 응답 키 { items, total, limit, offset } 우선 읽기
+        alertsData = Array.isArray(data) ? data : (data.items || data.alerts || []);
 
-        // 선택적으로 GET /api/stats 호출 (실패해도 경보 기반 계산으로 폴백)
         let stats = null;
         try {
           const statsRes = await fetch(`${API_BASE}/api/stats`);
           if (statsRes.ok) stats = await statsRes.json();
         } catch (_) {
-          // stats API 미구현 시 무시하고 프론트 집계 사용
+          // stats 실패 시 프론트 집계로 폴백
+        }
+
+        // 목록이 비었거나 선택했던 경보가 사라졌으면 상세 패널 비우기
+        if (
+          alertsData.length === 0 ||
+          (selectedAlertId !== null && !alertsData.some(a => String(a.id) === String(selectedAlertId)))
+        ) {
+          clearDetailPanel();
         }
 
         renderDashboardOverview(stats);
@@ -394,7 +547,6 @@
       }
     }
 
-    // 5초 주기 setInterval 폴링 시작
     function startPolling() {
       if (pollingTimer) clearInterval(pollingTimer);
       fetchDashboardData();
@@ -402,47 +554,70 @@
     }
 
     // ==========================================
-    // 4. 화면 렌더링 (폴링 시 상세 입력 폼 보호)
+    // 4. 화면 렌더링
     // ==========================================
-    // 폴링 시 KPI, 차트, 목록만 갱신하여 작성 중인 트리아지 입력값을 보호함
     function renderDashboardOverview(serverStats = null) {
       renderKPIAndChart(serverStats);
       renderAlertTable();
     }
 
-    // 상단 KPI 카드 및 확정 4종 카테고리 차트 무깜빡임 갱신
+    // 상단 KPI 및 6종(+미지 카테고리 포함) 차트 갱신
     function renderKPIAndChart(serverStats) {
       const total = serverStats?.total ?? alertsData.length;
-      const high = serverStats?.high_severity ?? alertsData.filter(a => a.severity === "SEV1" || a.severity === "SEV2").length;
+      const sevCounts = serverStats?.severity_counts;
+      const high = sevCounts
+        ? (Number(sevCounts.SEV1 || 0) + Number(sevCounts.SEV2 || 0))
+        : alertsData.filter(a => a.severity === "SEV1" || a.severity === "SEV2").length;
       const confirmed = alertsData.filter(a => a.is_confirmed_risk).length;
-      const unreviewed = alertsData.filter(a => a.verdict === "UNREVIEWED").length;
+      const unreviewed = alertsData.filter(a => (a.verdict || "UNREVIEWED") === "UNREVIEWED").length;
 
       document.getElementById("kpiTotal").textContent = total;
       document.getElementById("kpiHigh").textContent = high;
       document.getElementById("kpiConfirmed").textContent = confirmed;
       document.getElementById("kpiUnreviewed").textContent = unreviewed;
 
-      // 확정 4종 카테고리 집계
-      const counts = { sqli: 0, xss: 0, bruteforce: 0, portscan: 0 };
-      alertsData.forEach(a => {
-        const cat = String(a.category || "").toLowerCase();
-        if (counts[cat] !== undefined) counts[cat]++;
+      // 6종 기본 집계 + 서버/목록에 있는 모르는 카테고리도 버리지 않고 추가
+      const countsMap = {};
+      BASE_CATEGORIES.forEach(c => { countsMap[c.key] = 0; });
+
+      if (serverStats?.category_counts && typeof serverStats.category_counts === "object") {
+        Object.entries(serverStats.category_counts).forEach(([k, v]) => {
+          const key = String(k || "unknown").toLowerCase();
+          countsMap[key] = Number(v || 0);
+        });
+      } else {
+        alertsData.forEach(a => {
+          const key = String(a.category || "unknown").toLowerCase();
+          countsMap[key] = (countsMap[key] || 0) + 1;
+        });
+      }
+
+      const labels = [];
+      const values = [];
+      const colors = [];
+
+      BASE_CATEGORIES.forEach(c => {
+        labels.push(c.label);
+        values.push(countsMap[c.key] || 0);
+        colors.push(c.color);
       });
 
-      const chartValues = [counts.sqli, counts.xss, counts.bruteforce, counts.portscan];
+      // 6종 외 미지 카테고리 추가
+      Object.keys(countsMap).forEach(k => {
+        if (!BASE_CATEGORIES.some(c => c.key === k) && countsMap[k] > 0) {
+          labels.push(k.toUpperCase());
+          values.push(countsMap[k]);
+          colors.push("#94a3b8");
+        }
+      });
 
-      // 최초 1회만 생성하고 이후에는 데이터만 교체(깜빡임 방지)
       if (!categoryChartInstance) {
         const ctx = document.getElementById("categoryChart").getContext("2d");
         categoryChartInstance = new Chart(ctx, {
           type: "bar",
           data: {
-            labels: ["SQLi", "XSS", "BruteForce", "PortScan"],
-            datasets: [{
-              data: chartValues,
-              backgroundColor: ["#f43f5e", "#f59e0b", "#38bdf8", "#a855f7"],
-              borderRadius: 4
-            }]
+            labels,
+            datasets: [{ data: values, backgroundColor: colors, borderRadius: 4 }]
           },
           options: {
             responsive: true,
@@ -450,17 +625,18 @@
             plugins: { legend: { display: false } },
             scales: {
               y: { beginAtZero: true, ticks: { stepSize: 1, color: "#94a3b8" }, grid: { color: "#1e293b" } },
-              x: { ticks: { color: "#cbd5e1" }, grid: { display: false } }
+              x: { ticks: { color: "#cbd5e1", font: { size: 10 } }, grid: { display: false } }
             }
           }
         });
       } else {
-        categoryChartInstance.data.datasets[0].data = chartValues;
+        categoryChartInstance.data.labels = labels;
+        categoryChartInstance.data.datasets[0].data = values;
+        categoryChartInstance.data.datasets[0].backgroundColor = colors;
         categoryChartInstance.update("none");
       }
     }
 
-    // 심각도별 배지 스타일 반환
     function getSeverityClass(sev) {
       const map = {
         SEV1: "bg-rose-500/20 text-rose-400 border border-rose-500/40",
@@ -471,21 +647,30 @@
       return map[sev] || map.SEV4;
     }
 
-    // 경보 목록 테이블 렌더링 (Null 방어 + 문자열 ID 비교 + escapeHtml 적용)
     function renderAlertTable() {
       const catFilter = document.getElementById("filterCategory").value;
       const sevFilter = document.getElementById("filterSeverity").value;
+      const verdictFilter = document.getElementById("filterVerdict").value;
+      const keyword = document.getElementById("searchKeyword").value.trim().toLowerCase();
       const tbody = document.getElementById("alertTableBody");
 
       const filtered = alertsData.filter(a => {
         const cat = String(a.category || "").toLowerCase();
+        const verdict = a.verdict || "UNREVIEWED";
         const matchCat = catFilter === "ALL" || cat === catFilter;
         const matchSev = sevFilter === "ALL" || a.severity === sevFilter;
-        return matchCat && matchSev;
+        const matchVerdict = verdictFilter === "ALL" || verdict === verdictFilter;
+
+        const searchTarget = [
+          a.src_ip, a.dest_ip, a.signature, a.raw_url, a.mitre_id, a.sid, a.category
+        ].join(" ").toLowerCase();
+        const matchKeyword = !keyword || searchTarget.includes(keyword);
+
+        return matchCat && matchSev && matchVerdict && matchKeyword;
       });
 
       if (filtered.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" class="text-center py-8 text-slate-500">표시할 경보가 없습니다.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="5" class="text-center py-8 text-slate-500">조건에 맞는 경보가 없습니다.</td></tr>`;
         return;
       }
 
@@ -516,7 +701,6 @@
         `;
       }).join("");
 
-      // 행 클릭 시에만 상세 패널 갱신
       tbody.querySelectorAll("tr[data-alert-id]").forEach(row => {
         row.addEventListener("click", () => {
           selectedAlertId = row.getAttribute("data-alert-id");
@@ -529,7 +713,7 @@
       });
     }
 
-    // 우측 상세 정보, 트리아지 폼, 플레이북 렌더링
+    // 우측 상세 정보, 트리아지 폼, 공식 플레이북 렌더링
     function renderDetailPanel(alert) {
       document.getElementById("emptyDetail").classList.add("hidden");
       document.getElementById("detailPanel").classList.remove("hidden");
@@ -546,43 +730,71 @@
       document.getElementById("detailDest").textContent = `${alert.dest_ip || "-"}:${alert.dest_port ?? "-"}`;
       document.getElementById("detailUrl").textContent = alert.raw_url || "-";
 
-      // 플래그 배지 (확정 위험 / 민감정보 마스킹 여부)
       const flagsEl = document.getElementById("detailFlags");
       flagsEl.innerHTML = `
         ${alert.is_confirmed_risk ? `<span class="px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30">⚠️ 확정 위험 (200 격상 등)</span>` : ""}
         ${alert.pii_masked ? `<span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">🔒 PII 마스킹 적용됨</span>` : ""}
       `;
 
-      // 트리아지 폼 채우기
       document.getElementById("triageVerdict").value = alert.verdict || "UNREVIEWED";
       document.getElementById("triageConfidence").value = alert.confidence || "MEDIUM";
       document.getElementById("triageObservation").value = alert.observation || "";
       document.getElementById("triageAssessment").value = alert.assessment || "";
 
-      // 플레이북 렌더링 (차단 + 검증 + 롤백 세트)
-      const pbContainer = document.getElementById("playbookContainer");
+      // 공식 플레이북 구조(name, preserve_evidence_first, actions.linux / actions.ufw) 렌더링
       const pb = alert.playbook || {};
-      const steps = [
-        { label: "1. 차단 (Block)", cmd: replacePlaybookVars(pb.block, alert), color: "text-rose-300" },
-        { label: "2. 검증 (Verify)", cmd: replacePlaybookVars(pb.verify, alert), color: "text-sky-300" },
-        { label: "3. 롤백 (Rollback)", cmd: replacePlaybookVars(pb.rollback, alert), color: "text-emerald-300" }
-      ];
+      document.getElementById("playbookTitle").textContent = pb.name ? `대응 플레이북: ${pb.name}` : "대응 플레이북 (CLI 안내용)";
 
-      pbContainer.innerHTML = steps.map((s, idx) => `
-        <div class="bg-slate-950 border border-slate-800 rounded-lg p-2.5">
-          <div class="flex items-center justify-between mb-1">
-            <span class="font-semibold ${s.color}">${escapeHtml(s.label)}</span>
-            <button data-copy-idx="${idx}" class="copy-btn px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded text-[11px] transition">복사</button>
+      const evidenceEl = document.getElementById("playbookEvidenceNote");
+      if (pb.preserve_evidence_first) {
+        evidenceEl.textContent = `📌 증거 보존 우선: ${pb.preserve_evidence_first}`;
+        evidenceEl.classList.remove("hidden");
+      } else {
+        evidenceEl.classList.add("hidden");
+      }
+
+      const pbContainer = document.getElementById("playbookContainer");
+      const groups = extractPlaybookGroups(alert);
+
+      if (groups.length === 0) {
+        pbContainer.innerHTML = `<div class="bg-slate-950 border border-slate-800 rounded-lg p-3 text-slate-500">명령어 없음</div>`;
+        return;
+      }
+
+      const copyList = [];
+      pbContainer.innerHTML = groups.map(group => {
+        const rows = [
+          { label: "검증 (Verify)", cmd: group.verify, color: "text-sky-300" },
+          { label: "차단 (Block)", cmd: group.block, color: "text-rose-300" },
+          { label: "롤백 (Rollback)", cmd: group.rollback, color: "text-emerald-300" }
+        ];
+
+        const rowsHtml = rows.map(r => {
+          const idx = copyList.length;
+          copyList.push(r.cmd || "");
+          return `
+            <div class="bg-slate-950 border border-slate-800 rounded-lg p-2">
+              <div class="flex items-center justify-between mb-1">
+                <span class="font-semibold ${r.color}">${escapeHtml(r.label)}</span>
+                <button data-copy-idx="${idx}" class="copy-btn px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded text-[11px] transition">복사</button>
+              </div>
+              <code class="block font-mono text-[11px] text-slate-300 break-all">${escapeHtml(r.cmd || "명령어 없음")}</code>
+            </div>
+          `;
+        }).join("");
+
+        return `
+          <div class="space-y-1.5 pt-1">
+            <div class="text-[11px] font-bold text-slate-400">${escapeHtml(group.env)}</div>
+            ${rowsHtml}
           </div>
-          <code class="block font-mono text-[11px] text-slate-300 break-all">${escapeHtml(s.cmd || "명령어 없음")}</code>
-        </div>
-      `).join("");
+        `;
+      }).join("");
 
-      // 원클릭 복사 버튼 이벤트 바인딩
       pbContainer.querySelectorAll(".copy-btn").forEach(btn => {
         btn.addEventListener("click", async () => {
           const idx = Number(btn.getAttribute("data-copy-idx"));
-          const textToCopy = steps[idx]?.cmd || "";
+          const textToCopy = copyList[idx] || "";
           if (!textToCopy) return;
           try {
             await navigator.clipboard.writeText(textToCopy);
@@ -598,7 +810,6 @@
     // ==========================================
     // 5. 사용자 액션 (트리아지 저장, PCAP 업로드, 모드 전환)
     // ==========================================
-    // 트리아지 결과 저장
     document.getElementById("btnSaveTriage").addEventListener("click", async () => {
       if (selectedAlertId === null) return;
       const payload = {
@@ -624,7 +835,10 @@
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload)
         });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        if (!res.ok) {
+          const errText = await res.text();
+          throw new Error(`HTTP ${res.status} ${errText}`);
+        }
         setStatus(`✅ 경보 #${selectedAlertId} 트리아지 저장 완료`);
         await fetchDashboardData();
         const updated = alertsData.find(a => String(a.id) === String(selectedAlertId));
@@ -634,7 +848,7 @@
       }
     });
 
-    // PCAP 파일 업로드 (POST /api/pcap/upload)
+    // PCAP 파일 업로드 (POST /api/pcap/upload, 서버 에러 본문 표시)
     document.getElementById("pcapFileInput").addEventListener("change", async (e) => {
       const file = e.target.files[0];
       if (!file) return;
@@ -654,19 +868,23 @@
           method: "POST",
           body: formData
         });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        if (!res.ok) {
+          const errBody = await res.text();
+          throw new Error(`HTTP ${res.status} - ${errBody || "서버 오류"}`);
+        }
         setStatus(`✅ '${file.name}' 분석 완료! 경보를 갱신합니다.`);
         fetchDashboardData();
       } catch (err) {
-        setStatus(`🔴 PCAP 업로드 실패 (${err.message})`, true);
+        setStatus(`🔴 PCAP 업로드 실패: ${err.message}`, true);
       } finally {
         e.target.value = "";
       }
     });
 
-    // Mock / Live 모드 전환 버튼
+    // Mock / Live 모드 전환 시 이전 상세 패널 비우기
     document.getElementById("btnMockMode").addEventListener("click", () => {
       isLiveMode = false;
+      clearDetailPanel();
       document.getElementById("btnMockMode").className = "px-3 py-1 rounded-md font-semibold bg-sky-600 text-white transition";
       document.getElementById("btnLiveMode").className = "px-3 py-1 rounded-md font-semibold text-slate-400 hover:text-white transition";
       startPolling();
@@ -674,14 +892,82 @@
 
     document.getElementById("btnLiveMode").addEventListener("click", () => {
       isLiveMode = true;
+      clearDetailPanel();
       document.getElementById("btnLiveMode").className = "px-3 py-1 rounded-md font-semibold bg-emerald-600 text-white transition";
       document.getElementById("btnMockMode").className = "px-3 py-1 rounded-md font-semibold text-slate-400 hover:text-white transition";
       startPolling();
     });
 
-    // 필터 변경 이벤트
+    // ==========================================
+    // 6. 침해사고 분석 보고서(Markdown) 원클릭 내보내기
+    // ==========================================
+    function exportIncidentReport() {
+      if (!alertsData.length) {
+        setStatus("🔴 내보낼 경보 데이터가 없습니다.", true);
+        return;
+      }
+
+      const tpAlerts = alertsData.filter(a => a.verdict === "TP");
+      const targetAlerts = tpAlerts.length > 0 ? tpAlerts : alertsData;
+      const scopeLabel = tpAlerts.length > 0 ? "정탐(TP) 확정 경보 기준" : "전체 탐지 경보 기준";
+      const nowStr = new Date().toLocaleString("ko-KR");
+
+      let md = `# Mini-SIEM 침해사고 분석 보고서\n\n`;
+      md += `- **생성 시각**: ${nowStr}\n`;
+      md += `- **대상 범위**: ${scopeLabel} (총 ${targetAlerts.length}건)\n`;
+      md += `- **실습망 대역**: 172.28.0.0/24\n\n---\n\n`;
+
+      targetAlerts.forEach((a, idx) => {
+        const groups = extractPlaybookGroups(a);
+
+        md += `## ${idx + 1}. [${a.severity || "SEV4"}] ${a.signature || "Unknown Signature"}\n\n`;
+        md += `| 항목 | 내용 |\n|---|---|\n`;
+        md += `| **발생 시각** | ${a.timestamp || "-"} |\n`;
+        md += `| **카테고리 / SID** | ${(a.category || "-").toUpperCase()} (${a.sid ?? "-"}) |\n`;
+        md += `| **MITRE ATT&CK** | ${a.mitre_id || "-"} |\n`;
+        md += `| **출발지 → 목적지** | \`${a.src_ip || "-"}\` → \`${a.dest_ip || "-"}:${a.dest_port ?? "-"}\` |\n`;
+        md += `| **HTTP 상태 / 확정위험** | ${a.http_status ?? "-"} / ${a.is_confirmed_risk ? "예 (격상됨)" : "아니오"} |\n`;
+        md += `| **판정 / 신뢰도** | **${a.verdict || "UNREVIEWED"}** (${a.confidence || "MEDIUM"}) |\n\n`;
+
+        md += `### 1) 관찰된 사실 (Observation / Fact)\n`;
+        md += `${a.observation ? a.observation : "_작성된 관찰 사실 없음_"}\n\n`;
+
+        md += `### 2) 분석가 추정 (Assessment)\n`;
+        md += `${a.assessment ? a.assessment : "_작성된 분석가 추정 없음_"}\n\n`;
+
+        md += `### 3) 대응 플레이북 (수동 적용 안내)\n`;
+        if (groups.length === 0) {
+          md += `_명령어 없음_\n\n`;
+        } else {
+          groups.forEach(g => {
+            md += `#### ${g.env}\n\`\`\`bash\n`;
+            md += `# [검증]\n${g.verify || "명령어 없음"}\n\n`;
+            md += `# [차단]\n${g.block || "명령어 없음"}\n\n`;
+            md += `# [롤백]\n${g.rollback || "명령어 없음"}\n`;
+            md += `\`\`\`\n\n`;
+          });
+        }
+        md += `---\n\n`;
+      });
+
+      const blob = new Blob([md], { type: "text/markdown;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      const dateTag = new Date().toISOString().slice(0, 10);
+      link.href = url;
+      link.download = `mini-siem-report-${dateTag}.md`;
+      link.click();
+      URL.revokeObjectURL(url);
+
+      setStatus(`✅ 침해사고 보고서(mini-siem-report-${dateTag}.md) 다운로드 완료`);
+    }
+
+    // 필터, 검색, 보고서 내보내기 이벤트 연결
     document.getElementById("filterCategory").addEventListener("change", renderAlertTable);
     document.getElementById("filterSeverity").addEventListener("change", renderAlertTable);
+    document.getElementById("filterVerdict").addEventListener("change", renderAlertTable);
+    document.getElementById("searchKeyword").addEventListener("input", renderAlertTable);
+    document.getElementById("btnExportReport").addEventListener("click", exportIncidentReport);
 
     // 초기 실행
     startPolling();
