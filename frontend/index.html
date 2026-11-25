@@ -38,6 +38,31 @@
       animation: layerSevPulse 1.4s ease-in-out infinite;
     }
 
+    /* [P0] 작은 화면 가독성 보완 & 확대 보기 모드 */
+    .alert-sig-text {
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      word-break: break-word;
+    }
+
+    body.soc-zoom-mode {
+      font-size: 16px;
+    }
+    body.soc-zoom-mode .text-xs {
+      font-size: 0.875rem !important;
+      line-height: 1.35rem !important;
+    }
+    body.soc-zoom-mode .text-\[11px\],
+    body.soc-zoom-mode .text-\[10px\] {
+      font-size: 0.8rem !important;
+    }
+    body.soc-zoom-mode .alert-sig-text {
+      -webkit-line-clamp: unset;
+      overflow: visible;
+    }
+
     /* 접근성: prefers-reduced-motion 설정 시 애니메이션 비활성화 */
     @media (prefers-reduced-motion: reduce) {
       .flow-line,
@@ -59,27 +84,55 @@
       <p class="text-xs text-slate-400">Suricata 기반 실시간 관제 · 실습망(172.28.0.0/24) 전용</p>
     </div>
 
-    <div class="flex flex-wrap items-center gap-3">
+    <div class="flex flex-wrap items-center gap-2.5">
+      <!-- [P2] 관제 현황 ON/OFF 스위치 -->
+      <button type="button" id="btnToggleMonitoring" aria-pressed="true"
+        class="bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/50 text-emerald-300 text-xs font-bold px-3 py-2 rounded-lg transition">
+        🟢 관제 현황: ON
+      </button>
+
       <!-- PCAP 업로드 영역 (POST /api/pcap/upload, form 필드: file) -->
       <label class="cursor-pointer bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs px-3 py-2 rounded-lg transition">
         <span>📁 PCAP 업로드</span>
         <input type="file" id="pcapFileInput" accept=".pcap,.pcapng" class="hidden" />
       </label>
 
-      <!-- Discord 알림봇 설정 버튼 -->
-      <button type="button" id="btnAlertBotModal" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-semibold px-3 py-2 rounded-lg transition">
-        🔔 알림봇 설정
+      <!-- [P1] 로그 정리 (아카이빙) & 히스토리 뷰 버튼 -->
+      <button type="button" id="btnClearLogs"
+        class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-amber-300 text-xs font-semibold px-3 py-2 rounded-lg transition">
+        🧹 로그 정리
+      </button>
+      <button type="button" id="btnHistoryModal"
+        class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-semibold px-3 py-2 rounded-lg transition flex items-center gap-1.5">
+        <span>🗂️ 히스토리</span>
+        <span id="historyCountBadge" class="px-1.5 py-0.5 rounded-full bg-indigo-600 text-white text-[10px] font-bold">0</span>
       </button>
 
-      <!-- 웹 알림·대응 이력 보기 버튼 -->
-      <button type="button" id="btnNotifFeedModal" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-semibold px-3 py-2 rounded-lg transition flex items-center gap-1.5">
+      <!-- Discord 알림봇 설정 & 알림 이력 버튼 -->
+      <button type="button" id="btnAlertBotModal"
+        class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-semibold px-3 py-2 rounded-lg transition">
+        🔔 알림봇 설정
+      </button>
+      <button type="button" id="btnNotifFeedModal"
+        class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-semibold px-3 py-2 rounded-lg transition flex items-center gap-1.5">
         <span>📜 알림 이력</span>
         <span id="notifFeedCount" class="px-1.5 py-0.5 rounded-full bg-sky-600 text-white text-[10px] font-bold">0</span>
       </button>
 
-      <!-- 침해사고 보고서(.md) 원클릭 다운로드 버튼 -->
-      <button type="button" id="btnExportReport" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold px-3 py-2 rounded-lg transition">
-        📄 보고서 내보내기 (.md)
+      <!-- [P0] 가독성 확대 보기 토글 버튼 -->
+      <button type="button" id="btnZoomToggle" aria-pressed="false"
+        class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-semibold px-3 py-2 rounded-lg transition">
+        🔍 확대 보기: OFF
+      </button>
+
+      <!-- 보고서 내보내기 (.md) & [P2] 근무 교대 인수인계 보고서 -->
+      <button type="button" id="btnExportReport"
+        class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold px-3 py-2 rounded-lg transition">
+        📄 사고 보고서 (.md)
+      </button>
+      <button type="button" id="btnExportHandover"
+        class="bg-teal-600 hover:bg-teal-500 text-white text-xs font-semibold px-3 py-2 rounded-lg transition">
+        📋 인수인계 보고서
       </button>
 
       <!-- Mock / Live API 모드 토글 -->
@@ -90,9 +143,22 @@
     </div>
   </header>
 
-  <!-- 시스템 상태 및 에러 알림 배너 -->
-  <div id="statusBanner" class="bg-slate-900/80 border-b border-slate-800 px-6 py-2 text-xs text-slate-300 flex justify-between items-center">
-    <span id="statusMessage">🟡 Mock 데이터 모드로 동작 중입니다. (5초 주기 폴링 대기)</span>
+  <!-- [P0] 시스템 상태 배너 + 실시간 캡처 상태 동기화 영역 -->
+  <div id="statusBanner" class="bg-slate-900/80 border-b border-slate-800 px-6 py-2 text-xs text-slate-300 flex flex-wrap justify-between items-center gap-2">
+    <div class="flex flex-wrap items-center gap-3">
+      <span id="statusMessage">🟡 Mock 데이터 모드로 동작 중입니다. (5초 주기 폴링 대기)</span>
+      <span id="liveCaptureBadge" class="px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-[11px] font-mono text-amber-300">
+        📡 캡처 상태: Mock 시뮬레이션
+      </span>
+      <div class="flex items-center gap-1.5">
+        <button type="button" id="btnCopyCaptureStart" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 text-[11px] text-emerald-300 transition">
+          ▶ 캡처 시작 명령 복사
+        </button>
+        <button type="button" id="btnCopyCaptureStop" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 text-[11px] text-rose-300 transition">
+          ■ 캡처 중지 명령 복사
+        </button>
+      </div>
+    </div>
     <span id="lastUpdated" class="text-slate-500">마지막 갱신: -</span>
   </div>
 
@@ -149,8 +215,22 @@
 
         <!-- 좌측: 실시간 경보 테이블 -->
         <div class="lg:col-span-7 bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
-          <div class="p-4 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3">
-            <h2 class="text-sm font-semibold text-slate-200">실시간 탐지 경보</h2>
+          <div class="p-4 border-b border-slate-800 space-y-3">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <h2 class="text-sm font-semibold text-slate-200">실시간 탐지 경보</h2>
+              <!-- [P1] 관제 우선순위 정렬 토글 & 중복 그룹핑 토글 -->
+              <div class="flex flex-wrap items-center gap-2 text-xs">
+                <button type="button" id="btnToggleSort"
+                  class="px-2.5 py-1 rounded-md font-semibold bg-amber-600/20 border border-amber-500/40 text-amber-300 hover:bg-amber-600/30 transition">
+                  🔥 정렬: 우선순위순 (SLA)
+                </button>
+                <button type="button" id="btnToggleGrouping" aria-pressed="true"
+                  class="px-2.5 py-1 rounded-md font-semibold bg-sky-600/20 border border-sky-500/40 text-sky-300 hover:bg-sky-600/30 transition">
+                  📦 중복 묶기: ON
+                </button>
+              </div>
+            </div>
+
             <div class="flex flex-wrap gap-2 text-xs">
               <input
                 type="text"
@@ -191,7 +271,7 @@
                   <th class="px-3 py-3">심각도</th>
                   <th class="px-3 py-3">카테고리 / 시그니처</th>
                   <th class="px-3 py-3">출발지 → 목적지</th>
-                  <th class="px-3 py-3">판정</th>
+                  <th class="px-3 py-3">판정 / SLA</th>
                 </tr>
               </thead>
               <tbody id="alertTableBody" class="divide-y divide-slate-800">
@@ -214,7 +294,7 @@
                 <span id="detailSevBadge" class="px-2 py-0.5 rounded text-xs font-bold"></span>
                 <span id="detailMitre" class="text-xs font-mono text-sky-400"></span>
               </div>
-              <h3 id="detailSignature" class="text-base font-bold text-white"></h3>
+              <h3 id="detailSignature" class="text-base font-bold text-white break-words"></h3>
               <div class="grid grid-cols-2 gap-2 text-xs text-slate-300 bg-slate-950 p-3 rounded-lg border border-slate-800">
                 <div><span class="text-slate-500">SID:</span> <span id="detailSid" class="font-mono"></span></div>
                 <div><span class="text-slate-500">HTTP Status:</span> <span id="detailHttp" class="font-mono"></span></div>
@@ -224,7 +304,7 @@
                   <span class="text-slate-500">Raw URL:</span>
                   <code id="detailUrl" class="text-amber-300 font-mono"></code>
                 </div>
-                <div class="col-span-2 flex gap-2 pt-1" id="detailFlags"></div>
+                <div class="col-span-2 flex flex-wrap gap-2 pt-1" id="detailFlags"></div>
               </div>
             </div>
 
@@ -313,10 +393,17 @@
                 <h4 class="text-xs font-bold uppercase tracking-wider text-indigo-400">시각화 분석</h4>
                 <span class="text-[11px] text-slate-500">공격 흐름 · 토폴로지 구성도 · 계층 뷰</span>
               </div>
-              <div role="tablist" aria-label="시각화 보기 전환" class="flex items-center bg-slate-950 p-1 rounded-lg border border-slate-800 text-xs">
-                <button type="button" id="tabBtnFlow" role="tab" aria-selected="true" aria-controls="vizViewFlow" class="px-2.5 py-1 rounded-md font-semibold transition bg-indigo-600 text-white">공격 흐름</button>
-                <button type="button" id="tabBtnTopology" role="tab" aria-selected="false" aria-controls="vizViewTopology" class="px-2.5 py-1 rounded-md font-semibold transition text-slate-400 hover:text-slate-200">네트워크 구성도</button>
-                <button type="button" id="tabBtnOsi" role="tab" aria-selected="false" aria-controls="vizViewOsi" class="px-2.5 py-1 rounded-md font-semibold transition text-slate-400 hover:text-slate-200">OSI 7계층</button>
+              <div class="flex items-center gap-1.5">
+                <div role="tablist" aria-label="시각화 보기 전환" class="flex items-center bg-slate-950 p-1 rounded-lg border border-slate-800 text-xs">
+                  <button type="button" id="tabBtnFlow" role="tab" aria-selected="true" aria-controls="vizViewFlow" class="px-2.5 py-1 rounded-md font-semibold transition bg-indigo-600 text-white">공격 흐름</button>
+                  <button type="button" id="tabBtnTopology" role="tab" aria-selected="false" aria-controls="vizViewTopology" class="px-2.5 py-1 rounded-md font-semibold transition text-slate-400 hover:text-slate-200">네트워크 구성도</button>
+                  <button type="button" id="tabBtnOsi" role="tab" aria-selected="false" aria-controls="vizViewOsi" class="px-2.5 py-1 rounded-md font-semibold transition text-slate-400 hover:text-slate-200">OSI 7계층</button>
+                </div>
+                <!-- [P0] 시각화 요소 크게 보기 모달 버튼 -->
+                <button type="button" id="btnExpandViz" title="시각화 크게 보기"
+                  class="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-semibold transition">
+                  ⛶ 크게 보기
+                </button>
               </div>
             </div>
 
@@ -433,6 +520,78 @@
     </div> <!-- // viewAnalytics 끝 -->
   </main>
 
+  <!-- [P0] 시각화 크게 보기 모달 -->
+  <div id="vizExpandModal" class="hidden fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-xl max-w-4xl w-full p-5 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 id="vizExpandTitle" class="text-sm font-bold text-indigo-400">⛶ 시각화 확대 보기</h3>
+        <button type="button" id="btnCloseVizExpandModal" class="text-slate-400 hover:text-white text-sm px-2 py-1 rounded bg-slate-800">✕ 닫기</button>
+      </div>
+      <div id="vizExpandBody" class="bg-slate-950 border border-slate-800 rounded-lg p-4 min-h-[360px] flex flex-col justify-center"></div>
+    </div>
+  </div>
+
+  <!-- [P1] 히스토리 뷰 모달 (카테고리 트리 · 검색 · 오름/내림차순 조회) -->
+  <div id="historyModal" class="hidden fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-xl max-w-5xl w-full p-5 space-y-4 shadow-2xl max-h-[90vh] flex flex-col">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div>
+          <h3 class="text-sm font-bold text-indigo-400">🗂️ 정리된 경보 히스토리 (Archive Explorer)</h3>
+          <p class="text-[11px] text-slate-400">[로그 정리]로 이관된 경보를 카테고리·SID 트리별로 조회하고 오름/내림차순으로 분석합니다.</p>
+        </div>
+        <button type="button" id="btnCloseHistoryModal" class="text-slate-400 hover:text-white text-sm px-2 py-1 rounded bg-slate-800">✕</button>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-12 gap-4 flex-1 overflow-hidden min-h-[340px]">
+        <!-- 좌측: 공격 카테고리 -> SID 트리 -->
+        <div class="md:col-span-4 bg-slate-950 border border-slate-800 rounded-lg p-3 overflow-y-auto space-y-1">
+          <div class="text-[11px] font-bold text-slate-400 pb-1.5 border-b border-slate-800">공격 카테고리 트리</div>
+          <div id="historyCategoryTree" class="space-y-1 pt-1"></div>
+        </div>
+
+        <!-- 우측: 검색, 오름/내림차순 정렬, 이력 테이블 -->
+        <div class="md:col-span-8 flex flex-col gap-3 overflow-hidden">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <input type="text" id="historySearchInput" placeholder="히스토리 내 IP, 시그니처, URL, 트리아지 메모 검색..."
+              class="bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-sky-500 flex-1 min-w-[200px]" />
+
+            <div class="flex items-center gap-1.5 text-xs">
+              <button type="button" id="btnHistorySortDesc"
+                class="px-2.5 py-1.5 rounded-lg font-semibold bg-sky-600 text-white transition">
+                ⬇️ 내림차순 (최신순)
+              </button>
+              <button type="button" id="btnHistorySortAsc"
+                class="px-2.5 py-1.5 rounded-lg font-semibold bg-slate-800 text-slate-300 hover:text-white transition">
+                ⬆️ 오름차순 (과거순)
+              </button>
+              <button type="button" id="btnRestoreHistory"
+                class="px-2.5 py-1.5 rounded-lg font-semibold bg-emerald-600/20 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-600/30 transition">
+                ♻️ 전체 복원
+              </button>
+            </div>
+          </div>
+
+          <div id="historyResultSummary" class="text-[11px] text-slate-400">조회 결과: 0건</div>
+
+          <div class="flex-1 overflow-auto bg-slate-950 border border-slate-800 rounded-lg">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-800/70 text-slate-400 border-b border-slate-800 sticky top-0">
+                <tr>
+                  <th class="px-3 py-2">발생 시각</th>
+                  <th class="px-3 py-2">심각도</th>
+                  <th class="px-3 py-2">카테고리 / 시그니처</th>
+                  <th class="px-3 py-2">출발지 → 목적지</th>
+                  <th class="px-3 py-2">판정</th>
+                </tr>
+              </thead>
+              <tbody id="historyTableBody" class="divide-y divide-slate-800"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Discord 알림봇 설정 모달 -->
   <div id="alertBotModal" class="hidden fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
     <div class="bg-slate-900 border border-slate-700 rounded-xl max-w-md w-full p-5 space-y-4 shadow-2xl">
@@ -493,6 +652,7 @@
     // ==========================================
     const API_BASE = "http://localhost:8000";
     let isLiveMode = false;
+    let isMonitoringActive = true; // [P2] 관제 현황 ON/OFF
     let alertsData = [];
     let selectedAlertId = null;
     let pollingTimer = null;
@@ -971,11 +1131,330 @@
     }
 
     // ==========================================
+    // [P1-1] 관제 우선순위(SLA) 정렬 & 중복 그룹핑(src_ip + SID)
+    // ==========================================
+    let sortMode = "priority";    // "priority" | "latest"
+    let isGroupingEnabled = true;
+
+    const SLA_MINUTES_BY_SEV = {
+      SEV1: 15,
+      SEV2: 30,
+      SEV3: 60,
+      SEV4: 120
+    };
+
+    function calcSlaInfo(alert, nowMs = Date.now()) {
+      const limitMin = SLA_MINUTES_BY_SEV[alert.severity] || 120;
+      const eventMs = new Date(alert.timestamp || 0).getTime();
+      if (!eventMs || Number.isNaN(eventMs)) {
+        return { remainingMin: limitMin, isOverdue: false, label: `SLA ${limitMin}m` };
+      }
+      const elapsedMin = Math.floor((nowMs - eventMs) / 60000);
+      const remainingMin = limitMin - elapsedMin;
+      if (remainingMin < 0) {
+        return { remainingMin, isOverdue: true, label: `SLA ${Math.abs(remainingMin)}m 초과` };
+      }
+      return { remainingMin, isOverdue: false, label: `SLA ${remainingMin}m 남음` };
+    }
+
+    function sortAlerts(items, mode = "priority") {
+      const sevRank = { SEV1: 1, SEV2: 2, SEV3: 3, SEV4: 4 };
+      const nowMs = Date.now();
+
+      return [...items].sort((a, b) => {
+        if (mode === "latest") {
+          return new Date(b.timestamp || 0) - new Date(a.timestamp || 0);
+        }
+
+        // 1순위: 미검토(UNREVIEWED) 우선
+        const aUnrev = (a.verdict || "UNREVIEWED") === "UNREVIEWED" ? 0 : 1;
+        const bUnrev = (b.verdict || "UNREVIEWED") === "UNREVIEWED" ? 0 : 1;
+        if (aUnrev !== bUnrev) return aUnrev - bUnrev;
+
+        // 2순위: 심각도(SEV1 -> SEV4)
+        const aSev = sevRank[a.severity] || 4;
+        const bSev = sevRank[b.severity] || 4;
+        if (aSev !== bSev) return aSev - bSev;
+
+        // 3순위: SLA 임박 순
+        const aSla = calcSlaInfo(a, nowMs).remainingMin;
+        const bSla = calcSlaInfo(b, nowMs).remainingMin;
+        if (aSla !== bSla) return aSla - bSla;
+
+        // 4순위: 최신순
+        return new Date(b.timestamp || 0) - new Date(a.timestamp || 0);
+      });
+    }
+
+    function groupAlertsBySrcAndSid(sortedItems, enabled = true) {
+      if (!enabled) {
+        return sortedItems.map(alert => ({
+          representative: alert,
+          count: 1,
+          unreviewedCount: (alert.verdict || "UNREVIEWED") === "UNREVIEWED" ? 1 : 0,
+          items: [alert]
+        }));
+      }
+
+      const groups = new Map();
+      sortedItems.forEach(alert => {
+        const key = `${alert.src_ip || "unknown"}::${alert.sid ?? "unknown"}`;
+        if (!groups.has(key)) {
+          groups.set(key, {
+            representative: alert,
+            count: 0,
+            unreviewedCount: 0,
+            items: []
+          });
+        }
+        const g = groups.get(key);
+        g.items.push(alert);
+        g.count += 1;
+        if ((alert.verdict || "UNREVIEWED") === "UNREVIEWED") {
+          g.unreviewedCount += 1;
+        }
+      });
+
+      return Array.from(groups.values());
+    }
+
+    // ==========================================
+    // [P1-2] 로그 정리(아카이빙) & 히스토리 뷰
+    // ==========================================
+    const archivedAlertIds = new Set();
+    const historyAlertsMap = new Map();
+    let historySelectedCat = "ALL";
+    let historySelectedSid = "ALL";
+    let historySortOrder = "desc"; // "desc" | "asc"
+
+    function updateHistoryBadgeCount() {
+      const badge = document.getElementById("historyCountBadge");
+      if (badge) badge.textContent = String(historyAlertsMap.size);
+    }
+
+    function clearActiveAlertsToHistory() {
+      if (!alertsData || alertsData.length === 0) {
+        setStatus("🟡 정리할 활성 경보가 없습니다.");
+        return;
+      }
+
+      let movedCount = 0;
+      alertsData.forEach(alert => {
+        const key = String(alert.id);
+        archivedAlertIds.add(key);
+        historyAlertsMap.set(key, JSON.parse(JSON.stringify(alert)));
+        movedCount += 1;
+      });
+
+      alertsData = [];
+      clearDetailPanel();
+      updateHistoryBadgeCount();
+      renderDashboardOverview();
+
+      pushWebNotification({
+        title: `🧹 활성 경보 ${movedCount}건 히스토리 이관 완료`,
+        description: "메인 관제 대기열이 초기화(0건)되었습니다. 이관된 로그는 [히스토리]에서 조회할 수 있습니다.",
+        color: 1096065
+      }, "로그 정리");
+
+      setStatus(`✅ 활성 경보 ${movedCount}건을 히스토리로 정리했습니다. (현재 활성: 0건)`);
+    }
+
+    function restoreAllHistoryAlerts() {
+      if (historyAlertsMap.size === 0) return;
+      const restoredCount = historyAlertsMap.size;
+      archivedAlertIds.clear();
+      historyAlertsMap.clear();
+      updateHistoryBadgeCount();
+      renderHistoryModal();
+      if (isMonitoringActive) {
+        fetchDashboardData();
+      }
+      setStatus(`♻️ 히스토리 경보 ${restoredCount}건을 활성 관제 목록으로 복원했습니다.`);
+    }
+
+    function renderHistoryModal() {
+      const treeContainer = document.getElementById("historyCategoryTree");
+      const tbody = document.getElementById("historyTableBody");
+      const summaryEl = document.getElementById("historyResultSummary");
+      if (!treeContainer || !tbody) return;
+
+      const allHistory = Array.from(historyAlertsMap.values());
+      treeContainer.textContent = "";
+
+      const rootBtn = document.createElement("button");
+      rootBtn.type = "button";
+      rootBtn.className = `w-full text-left px-2.5 py-1.5 rounded text-xs font-bold flex items-center justify-between transition ${
+        historySelectedCat === "ALL" ? "bg-sky-600 text-white" : "text-slate-300 hover:bg-slate-800"
+      }`;
+      rootBtn.textContent = `📁 전체 이력 (${allHistory.length})`;
+      rootBtn.addEventListener("click", () => {
+        historySelectedCat = "ALL";
+        historySelectedSid = "ALL";
+        renderHistoryModal();
+      });
+      treeContainer.appendChild(rootBtn);
+
+      const catMap = new Map();
+      allHistory.forEach(a => {
+        const cat = String(a.category || "unknown").toLowerCase();
+        const sid = String(a.sid ?? "UNKNOWN");
+        if (!catMap.has(cat)) catMap.set(cat, { count: 0, sids: new Map() });
+        const entry = catMap.get(cat);
+        entry.count += 1;
+        entry.sids.set(sid, (entry.sids.get(sid) || 0) + 1);
+      });
+
+      catMap.forEach((info, catKey) => {
+        const groupWrap = document.createElement("div");
+        groupWrap.className = "pl-2 space-y-1 pt-1";
+
+        const isCatSelected = historySelectedCat === catKey && historySelectedSid === "ALL";
+        const catBtn = document.createElement("button");
+        catBtn.type = "button";
+        catBtn.className = `w-full text-left px-2 py-1 rounded text-[11px] font-semibold flex items-center justify-between transition ${
+          isCatSelected ? "bg-sky-600/80 text-white" : "text-slate-300 hover:bg-slate-800/80"
+        }`;
+        catBtn.textContent = `├─ ${catKey.toUpperCase()} (${info.count})`;
+        catBtn.addEventListener("click", () => {
+          historySelectedCat = catKey;
+          historySelectedSid = "ALL";
+          renderHistoryModal();
+        });
+        groupWrap.appendChild(catBtn);
+
+        info.sids.forEach((sidCount, sidKey) => {
+          const isSidSelected = historySelectedCat === catKey && historySelectedSid === sidKey;
+          const sidBtn = document.createElement("button");
+          sidBtn.type = "button";
+          sidBtn.className = `w-full text-left pl-5 pr-2 py-0.5 rounded text-[10px] font-mono flex items-center justify-between transition ${
+            isSidSelected ? "bg-indigo-600 text-white" : "text-slate-400 hover:bg-slate-800/60"
+          }`;
+          sidBtn.textContent = `└ SID ${sidKey} (${sidCount})`;
+          sidBtn.addEventListener("click", () => {
+            historySelectedCat = catKey;
+            historySelectedSid = sidKey;
+            renderHistoryModal();
+          });
+          groupWrap.appendChild(sidBtn);
+        });
+
+        treeContainer.appendChild(groupWrap);
+      });
+
+      const keyword = (document.getElementById("historySearchInput")?.value || "").trim().toLowerCase();
+      const filtered = allHistory.filter(a => {
+        const cat = String(a.category || "unknown").toLowerCase();
+        const sid = String(a.sid ?? "UNKNOWN");
+        if (historySelectedCat !== "ALL" && cat !== historySelectedCat) return false;
+        if (historySelectedSid !== "ALL" && sid !== historySelectedSid) return false;
+        if (!keyword) return true;
+        const blob = [
+          a.src_ip, a.dest_ip, a.signature, a.raw_url, a.mitre_id, a.sid, a.category, a.observation, a.assessment
+        ].join(" ").toLowerCase();
+        return blob.includes(keyword);
+      });
+
+      filtered.sort((a, b) => {
+        const tA = new Date(a.timestamp || 0).getTime();
+        const tB = new Date(b.timestamp || 0).getTime();
+        return historySortOrder === "asc" ? tA - tB : tB - tA;
+      });
+
+      if (summaryEl) {
+        const orderLabel = historySortOrder === "asc" ? "오름차순(과거→최신)" : "내림차순(최신→과거)";
+        summaryEl.textContent = `조회 결과: ${filtered.length}건 · 정렬: ${orderLabel}`;
+      }
+
+      tbody.textContent = "";
+      if (filtered.length === 0) {
+        const tr = document.createElement("tr");
+        const td = document.createElement("td");
+        td.colSpan = 5;
+        td.className = "text-center py-8 text-slate-500";
+        td.textContent = allHistory.length === 0
+          ? "히스토리에 이관된 로그가 없습니다. 상단 [로그 정리]를 누르면 이곳에 보관됩니다."
+          : "검색 또는 트리 조건에 일치하는 히스토리 로그가 없습니다.";
+        tr.appendChild(td);
+        tbody.appendChild(tr);
+        return;
+      }
+
+      filtered.forEach(alert => {
+        const tr = document.createElement("tr");
+        tr.className = "hover:bg-slate-800/50 transition";
+
+        const tdTime = document.createElement("td");
+        tdTime.className = "px-3 py-2.5 font-mono text-slate-400 whitespace-nowrap";
+        tdTime.textContent = String(alert.timestamp || "-").replace("T", " ").slice(0, 19);
+
+        const tdSev = document.createElement("td");
+        tdSev.className = "px-3 py-2.5 font-bold";
+        tdSev.style.color = getSeverityHexColor(alert.severity);
+        tdSev.textContent = alert.severity || "SEV4";
+
+        const tdSig = document.createElement("td");
+        tdSig.className = "px-3 py-2.5 text-slate-200 break-words";
+        tdSig.textContent = `[${String(alert.category || "-").toUpperCase()}] ${alert.signature || "-"}`;
+
+        const tdFlow = document.createElement("td");
+        tdFlow.className = "px-3 py-2.5 font-mono text-slate-300 whitespace-nowrap";
+        tdFlow.textContent = `${alert.src_ip || "-"} → ${alert.dest_ip || "-"}:${alert.dest_port ?? "-"}`;
+
+        const tdVerdict = document.createElement("td");
+        tdVerdict.className = "px-3 py-2.5 font-bold text-slate-300";
+        tdVerdict.textContent = alert.verdict || "UNREVIEWED";
+
+        tr.append(tdTime, tdSev, tdSig, tdFlow, tdVerdict);
+        tbody.appendChild(tr);
+      });
+    }
+
+    // ==========================================
+    // [P0] 실시간 캡처 상태(/api/live/status) 동기화
+    // ==========================================
+    let isZoomMode = false;
+
+    function renderLiveCaptureStatus(statusObj) {
+      const badge = document.getElementById("liveCaptureBadge");
+      if (!badge) return;
+
+      if (!isLiveMode) {
+        badge.textContent = "📡 캡처 상태: Mock 시뮬레이션";
+        badge.className = "px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-[11px] font-mono text-amber-300";
+        return;
+      }
+
+      if (!statusObj) {
+        badge.textContent = "📡 캡처 상태: 엔드포인트 미응답";
+        badge.className = "px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-[11px] font-mono text-slate-400";
+        return;
+      }
+
+      const isRunning = Boolean(statusObj.running ?? statusObj.active ?? statusObj.status === "running");
+      const iface = statusObj.interface || statusObj.iface || "br-minisiem";
+      const pcapCount = statusObj.captured_packets ?? statusObj.packets ?? null;
+      const packetSuffix = pcapCount !== null ? ` · ${pcapCount} pkts` : "";
+
+      if (isRunning) {
+        badge.textContent = `📡 실시간 캡처: RUNNING (${iface}${packetSuffix})`;
+        badge.className = "px-2 py-0.5 rounded bg-emerald-500/15 border border-emerald-500/40 text-[11px] font-mono text-emerald-300 font-semibold";
+      } else {
+        badge.textContent = `📡 실시간 캡처: STOPPED (${iface})`;
+        badge.className = "px-2 py-0.5 rounded bg-rose-500/15 border border-rose-500/40 text-[11px] font-mono text-rose-300";
+      }
+    }
+
+    // ==========================================
     // 3. 데이터 로딩 (Mock / Live 5초 폴링)
     // ==========================================
     async function fetchDashboardData() {
+      if (!isMonitoringActive) return;
+
       if (!isLiveMode) {
-        alertsData = JSON.parse(JSON.stringify(MOCK_ALERTS));
+        const rawMocks = JSON.parse(JSON.stringify(MOCK_ALERTS));
+        alertsData = rawMocks.filter(a => !archivedAlertIds.has(String(a.id)));
+        renderLiveCaptureStatus(null);
         renderDashboardOverview();
         setStatus("🟡 Mock 데이터 모드로 동작 중입니다. (백엔드 없이 테스트 가능)");
         return;
@@ -985,13 +1464,21 @@
         const res = await fetch(`${API_BASE}/api/alerts?limit=50`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
-        alertsData = Array.isArray(data) ? data : (data.items || data.alerts || []);
+        const rawAlerts = Array.isArray(data) ? data : (data.items || data.alerts || []);
+        alertsData = rawAlerts.filter(a => !archivedAlertIds.has(String(a.id)));
 
         let stats = null;
         try {
           const statsRes = await fetch(`${API_BASE}/api/stats`);
           if (statsRes.ok) stats = await statsRes.json();
         } catch (_) {}
+
+        let liveStatus = null;
+        try {
+          const liveRes = await fetch(`${API_BASE}/api/live/status`);
+          if (liveRes.ok) liveStatus = await liveRes.json();
+        } catch (_) {}
+        renderLiveCaptureStatus(liveStatus);
 
         if (
           alertsData.length === 0 ||
@@ -1009,6 +1496,7 @@
 
     function startPolling() {
       if (pollingTimer) clearInterval(pollingTimer);
+      if (!isMonitoringActive) return;
       fetchDashboardData();
       pollingTimer = setInterval(fetchDashboardData, 5000);
     }
@@ -1023,12 +1511,15 @@
       if (currentMainView === "analytics") {
         renderAnalyticsDashboard();
       }
-      checkAndAutoNotifySev1(alertsData);
+      if (isMonitoringActive) {
+        checkAndAutoNotifySev1(alertsData);
+      }
     }
 
     function renderKPIAndChart(serverStats) {
-      const total = serverStats?.total ?? alertsData.length;
-      const sevCounts = serverStats?.severity_counts;
+      const useClientCount = archivedAlertIds.size > 0;
+      const total = (!useClientCount && serverStats?.total !== undefined) ? serverStats.total : alertsData.length;
+      const sevCounts = !useClientCount ? serverStats?.severity_counts : null;
       const high = sevCounts
         ? (Number(sevCounts.SEV1 || 0) + Number(sevCounts.SEV2 || 0))
         : alertsData.filter(a => a.severity === "SEV1" || a.severity === "SEV2").length;
@@ -1043,7 +1534,7 @@
       const countsMap = {};
       BASE_CATEGORIES.forEach(c => { countsMap[c.key] = 0; });
 
-      if (serverStats?.category_counts && typeof serverStats.category_counts === "object") {
+      if (!useClientCount && serverStats?.category_counts && typeof serverStats.category_counts === "object") {
         Object.entries(serverStats.category_counts).forEach(([k, v]) => {
           const key = String(k || "unknown").toLowerCase();
           countsMap[key] = Number(v || 0);
@@ -1131,16 +1622,24 @@
         return matchCat && matchSev && matchVerdict && matchKeyword;
       });
 
-      if (filtered.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" class="text-center py-8 text-slate-500">조건에 맞는 경보가 없습니다.</td></tr>`;
+      const sorted = sortAlerts(filtered, sortMode);
+      const groupedRows = groupAlertsBySrcAndSid(sorted, isGroupingEnabled);
+
+      if (groupedRows.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="text-center py-8 text-slate-500">조건에 맞는 활성 경보가 없습니다.</td></tr>`;
         return;
       }
 
-      tbody.innerHTML = filtered.map(alert => {
-        const isSelected = String(alert.id) === String(selectedAlertId);
+      const nowMs = Date.now();
+      tbody.innerHTML = groupedRows.map(group => {
+        const alert = group.representative;
+        const isSelected = group.items.some(item => String(item.id) === String(selectedAlertId));
         const rowBg = isSelected ? "bg-sky-950/60" : "hover:bg-slate-800/50";
         const riskBadge = alert.is_confirmed_risk
           ? `<span class="ml-1 px-1.5 py-0.5 text-[10px] bg-rose-600 text-white rounded">확정위험</span>`
+          : "";
+        const dupBadge = group.count > 1
+          ? `<span class="ml-1 px-1.5 py-0.5 text-[10px] bg-indigo-600/80 text-white rounded font-mono">× ${group.count}건${group.unreviewedCount > 0 ? ` · 미검토 ${group.unreviewedCount}` : ""}</span>`
           : "";
         const containedBadge = isIpContained(alert.src_ip)
           ? `<span class="ml-1 px-1.5 py-0.5 text-[10px] bg-amber-600 text-white rounded">🔒 격리됨</span>`
@@ -1150,18 +1649,32 @@
         const categoryText = String(alert.category || "unknown").toUpperCase();
         const timeText = String(alert.timestamp || "").slice(11, 19) || "-";
 
+        let slaHtml = "";
+        if (verdict === "UNREVIEWED") {
+          const sla = calcSlaInfo(alert, nowMs);
+          const slaColor = sla.isOverdue ? "text-rose-400 font-semibold" : "text-amber-300/90";
+          slaHtml = `<div class="text-[10px] ${slaColor} mt-0.5">${escapeHtml(sla.label)}</div>`;
+        }
+
         return `
           <tr data-alert-id="${escapeHtml(alert.id)}" class="cursor-pointer transition ${rowBg}">
             <td class="px-4 py-3 font-mono text-slate-400 whitespace-nowrap">${escapeHtml(timeText)}</td>
             <td class="px-3 py-3"><span class="px-2 py-0.5 rounded font-bold ${getSeverityClass(alert.severity)}">${escapeHtml(alert.severity || "SEV4")}</span></td>
             <td class="px-3 py-3">
-              <div class="font-semibold text-slate-200">${escapeHtml(categoryText)} <span class="text-slate-500 font-mono">(${escapeHtml(alert.sid ?? "-")})</span>${riskBadge}</div>
-              <div class="text-slate-400 truncate max-w-[260px]">${escapeHtml(alert.signature || "-")}</div>
+              <div class="font-semibold text-slate-200 flex flex-wrap items-center gap-1">
+                <span>${escapeHtml(categoryText)}</span>
+                <span class="text-slate-500 font-mono">(${escapeHtml(alert.sid ?? "-")})</span>
+                ${riskBadge}${dupBadge}
+              </div>
+              <div class="text-slate-400 alert-sig-text min-w-[180px] max-w-[340px]">${escapeHtml(alert.signature || "-")}</div>
             </td>
             <td class="px-3 py-3 font-mono text-slate-300 whitespace-nowrap">
               ${escapeHtml(alert.src_ip || "-")}${containedBadge} → ${escapeHtml(alert.dest_ip || "-")}:${escapeHtml(alert.dest_port ?? "-")}
             </td>
-            <td class="px-3 py-3 font-bold ${verdictColor}">${escapeHtml(verdict)}</td>
+            <td class="px-3 py-3 whitespace-nowrap">
+              <div class="font-bold ${verdictColor}">${escapeHtml(verdict)}</div>
+              ${slaHtml}
+            </td>
           </tr>
         `;
       }).join("");
@@ -1276,7 +1789,7 @@
     }
 
     // ==========================================
-    // 5-V. 시각화 (공격 흐름, 네트워크 구성도, OSI 7계층)
+    // 5-V. 시각화 (공격 흐름, 네트워크 구성도, OSI 7계층 + 확대 모달 지원)
     // ==========================================
     function getTacticsLabel(category) {
       const cat = String(category || "").toLowerCase();
@@ -1293,20 +1806,24 @@
       return map[sev] || "#94a3b8";
     }
 
-    function renderStory(items) {
+    function renderStory(items, targetId = "storyContainer") {
       const emptyStateEl = document.getElementById("vizEmptyState");
       const vizContentEl = document.getElementById("vizContent");
-      const storyContainer = document.getElementById("storyContainer");
+      const storyContainer = document.getElementById(targetId);
 
       if (!items || items.length === 0) {
-        if (emptyStateEl) emptyStateEl.classList.remove("hidden");
-        if (vizContentEl) vizContentEl.classList.add("hidden");
+        if (targetId === "storyContainer") {
+          if (emptyStateEl) emptyStateEl.classList.remove("hidden");
+          if (vizContentEl) vizContentEl.classList.add("hidden");
+        }
         if (storyContainer) storyContainer.textContent = "";
         return;
       }
 
-      if (emptyStateEl) emptyStateEl.classList.add("hidden");
-      if (vizContentEl) vizContentEl.classList.remove("hidden");
+      if (targetId === "storyContainer") {
+        if (emptyStateEl) emptyStateEl.classList.add("hidden");
+        if (vizContentEl) vizContentEl.classList.remove("hidden");
+      }
       if (!storyContainer) return;
 
       const sorted = [...items].sort((a, b) => new Date(a.timestamp || 0) - new Date(b.timestamp || 0));
@@ -1347,7 +1864,7 @@
         body.appendChild(topRow);
 
         const sigDiv = document.createElement("div");
-        sigDiv.className = "text-slate-300 truncate";
+        sigDiv.className = "text-slate-300 break-words";
         sigDiv.textContent = alert.signature || "-";
         body.appendChild(sigDiv);
 
@@ -1394,12 +1911,13 @@
       }
     }
 
-    function renderPath(items, selected) {
-      const container = document.getElementById("pathSvgContainer");
+    function renderPath(items, selected, targetId = "pathSvgContainer") {
+      const container = document.getElementById(targetId);
       if (!container) return;
       container.textContent = "";
       if (!items || items.length === 0) return;
 
+      const markerPrefix = targetId === "pathSvgContainer" ? "arrow" : "arrow-exp";
       const linksMap = new Map();
       items.forEach(a => {
         const src = a.src_ip || "unknown";
@@ -1437,7 +1955,7 @@
       const defs = document.createElementNS(svgNS, "defs");
       ["SEV1", "SEV2", "SEV3", "SEV4"].forEach(sev => {
         const marker = document.createElementNS(svgNS, "marker");
-        marker.setAttribute("id", `arrow-${sev}`);
+        marker.setAttribute("id", `${markerPrefix}-${sev}`);
         marker.setAttribute("viewBox", "0 0 10 10");
         marker.setAttribute("refX", "9");
         marker.setAttribute("refY", "5");
@@ -1473,7 +1991,7 @@
         line.setAttribute("y2", String(end.y + yOffset));
         line.setAttribute("stroke", strokeColor);
         line.setAttribute("stroke-width", String(isCurrentSelected ? 4 : 2));
-        if (!isC2) line.setAttribute("marker-end", `url(#arrow-${highestSev})`);
+        if (!isC2) line.setAttribute("marker-end", `url(#${markerPrefix}-${highestSev})`);
         else line.setAttribute("stroke-dasharray", "4 3");
         line.setAttribute("stroke-opacity", isCurrentSelected ? "1" : "0.75");
         g.appendChild(line);
@@ -1616,9 +2134,6 @@
       container.appendChild(svg);
     }
 
-    // ==========================================
-    // 5-B. 네트워크 구성도 (토폴로지) SVG 렌더링
-    // ==========================================
     function getKnownHostName(ip) {
       if (ip === "172.28.0.100") return "attacker";
       if (ip === "172.28.0.10") return "victim-web";
@@ -1626,12 +2141,13 @@
       return null;
     }
 
-    function renderTopology(items, selected) {
-      const container = document.getElementById("topologySvgContainer");
+    function renderTopology(items, selected, targetId = "topologySvgContainer") {
+      const container = document.getElementById(targetId);
       if (!container) return;
       container.textContent = "";
       if (!items || items.length === 0) return;
 
+      const markerPrefix = targetId === "topologySvgContainer" ? "topo-arrow" : "topo-arrow-exp";
       const svgNS = "http://www.w3.org/2000/svg";
       const svgWidth = 500, svgHeight = 360;
       const svg = document.createElementNS(svgNS, "svg");
@@ -1642,7 +2158,7 @@
       const defs = document.createElementNS(svgNS, "defs");
       ["SEV1", "SEV2", "SEV3", "SEV4"].forEach(sev => {
         const marker = document.createElementNS(svgNS, "marker");
-        marker.setAttribute("id", `topo-arrow-${sev}`);
+        marker.setAttribute("id", `${markerPrefix}-${sev}`);
         marker.setAttribute("viewBox", "0 0 10 10");
         marker.setAttribute("refX", "9");
         marker.setAttribute("refY", "5");
@@ -1753,7 +2269,7 @@
         if (isC2) pathEl.setAttribute("class", "c2-blink-line");
         else {
           pathEl.setAttribute("class", "flow-line");
-          pathEl.setAttribute("marker-end", `url(#topo-arrow-${highestSev})`);
+          pathEl.setAttribute("marker-end", `url(#${markerPrefix}-${highestSev})`);
         }
         g.appendChild(pathEl);
 
@@ -1894,11 +2410,8 @@
       container.appendChild(svg);
     }
 
-    // ==========================================
-    // 5-C. OSI 7계층 공격 분포 뷰 렌더링
-    // ==========================================
-    function renderOsiLayers(items, selected) {
-      const container = document.getElementById("osiLayersContainer");
+    function renderOsiLayers(items, selected, targetId = "osiLayersContainer") {
+      const container = document.getElementById(targetId);
       if (!container) return;
       container.textContent = "";
       if (!items || items.length === 0) return;
@@ -2053,6 +2566,52 @@
       renderCurrentViz();
     }
 
+    // [P0] 시각화 확대 보기 모달 열기
+    function openExpandedVizModal() {
+      const modal = document.getElementById("vizExpandModal");
+      const titleEl = document.getElementById("vizExpandTitle");
+      const bodyEl = document.getElementById("vizExpandBody");
+      if (!modal || !bodyEl) return;
+
+      const currentSelected = alertsData.find(a => String(a.id) === String(selectedAlertId));
+      bodyEl.textContent = "";
+
+      if (!alertsData || alertsData.length === 0) {
+        bodyEl.textContent = "표시할 공격 데이터가 없습니다.";
+        modal.classList.remove("hidden");
+        return;
+      }
+
+      if (currentVizTab === "flow") {
+        if (titleEl) titleEl.textContent = "⛶ 공격 경로 토폴로지 및 진행 타임라인 (확대 보기)";
+        const pathWrap = document.createElement("div");
+        pathWrap.id = "expandedPathContainer";
+        pathWrap.className = "w-full py-2";
+        const storyWrap = document.createElement("div");
+        storyWrap.id = "expandedStoryContainer";
+        storyWrap.className = "space-y-2 text-xs mt-4 border-t border-slate-800 pt-4";
+        bodyEl.append(pathWrap, storyWrap);
+        renderPath(alertsData, currentSelected, "expandedPathContainer");
+        renderStory(alertsData, "expandedStoryContainer");
+      } else if (currentVizTab === "topology") {
+        if (titleEl) titleEl.textContent = "⛶ 실습망 네트워크 구성도 (172.28.0.0/24 · 확대 보기)";
+        const topoWrap = document.createElement("div");
+        topoWrap.id = "expandedTopoContainer";
+        topoWrap.className = "w-full py-2";
+        bodyEl.appendChild(topoWrap);
+        renderTopology(alertsData, currentSelected, "expandedTopoContainer");
+      } else if (currentVizTab === "osi") {
+        if (titleEl) titleEl.textContent = "⛶ OSI 7계층 공격 분포 (확대 보기)";
+        const osiWrap = document.createElement("div");
+        osiWrap.id = "expandedOsiContainer";
+        osiWrap.className = "space-y-2 text-xs";
+        bodyEl.appendChild(osiWrap);
+        renderOsiLayers(alertsData, currentSelected, "expandedOsiContainer");
+      }
+
+      modal.classList.remove("hidden");
+    }
+
     // ==========================================
     // 5. 사용자 액션 (트리아지 저장, PCAP 업로드, 모드 전환)
     // ==========================================
@@ -2068,7 +2627,9 @@
       if (!isLiveMode) {
         const target = MOCK_ALERTS.find(a => String(a.id) === String(selectedAlertId));
         if (target) Object.assign(target, payload);
-        await fetchDashboardData();
+        const activeTarget = alertsData.find(a => String(a.id) === String(selectedAlertId));
+        if (activeTarget) Object.assign(activeTarget, payload);
+        renderDashboardOverview();
         const updated = alertsData.find(a => String(a.id) === String(selectedAlertId));
         if (updated) renderDetailPanel(updated);
         setStatus(`✅ [Mock] 경보 #${selectedAlertId} 트리아지 저장 완료`);
@@ -2083,7 +2644,13 @@
         });
         if (!res.ok) throw new Error(`HTTP ${res.status} ${await res.text()}`);
         setStatus(`✅ 경보 #${selectedAlertId} 트리아지 저장 완료`);
-        await fetchDashboardData();
+        if (isMonitoringActive) {
+          await fetchDashboardData();
+        } else {
+          const activeTarget = alertsData.find(a => String(a.id) === String(selectedAlertId));
+          if (activeTarget) Object.assign(activeTarget, payload);
+          renderDashboardOverview();
+        }
         const updated = alertsData.find(a => String(a.id) === String(selectedAlertId));
         if (updated) renderDetailPanel(updated);
       } catch (err) {
@@ -2106,7 +2673,7 @@
         const res = await fetch(`${API_BASE}/api/pcap/upload`, { method: "POST", body: formData });
         if (!res.ok) throw new Error(`HTTP ${res.status} - ${await res.text() || "서버 오류"}`);
         setStatus(`✅ '${file.name}' 분석 완료! 경보를 갱신합니다.`);
-        fetchDashboardData();
+        if (isMonitoringActive) fetchDashboardData();
       } catch (err) {
         setStatus(`🔴 PCAP 업로드 실패: ${err.message}`, true);
       } finally {
@@ -2119,7 +2686,8 @@
       clearDetailPanel();
       document.getElementById("btnMockMode").className = "px-3 py-1 rounded-md font-semibold bg-sky-600 text-white transition";
       document.getElementById("btnLiveMode").className = "px-3 py-1 rounded-md font-semibold text-slate-400 hover:text-white transition";
-      startPolling();
+      if (isMonitoringActive) startPolling();
+      else renderLiveCaptureStatus(null);
     });
 
     document.getElementById("btnLiveMode").addEventListener("click", () => {
@@ -2127,11 +2695,11 @@
       clearDetailPanel();
       document.getElementById("btnLiveMode").className = "px-3 py-1 rounded-md font-semibold bg-emerald-600 text-white transition";
       document.getElementById("btnMockMode").className = "px-3 py-1 rounded-md font-semibold text-slate-400 hover:text-white transition";
-      startPolling();
+      if (isMonitoringActive) startPolling();
     });
 
     // ==========================================
-    // 6. 침해사고 분석 보고서(Markdown) 원클릭 내보내기
+    // 6. 침해사고 분석 보고서 & [P2] 근무 교대 인수인계 보고서
     // ==========================================
     function exportIncidentReport() {
       if (!alertsData.length) {
@@ -2182,14 +2750,145 @@
       setStatus(`✅ 침해사고 보고서(mini-siem-report-${dateTag}.md) 다운로드 완료`);
     }
 
-    document.getElementById("filterCategory").addEventListener("change", renderAlertTable);
-    document.getElementById("filterSeverity").addEventListener("change", renderAlertTable);
-    document.getElementById("filterVerdict").addEventListener("change", renderAlertTable);
-    document.getElementById("searchKeyword").addEventListener("input", renderAlertTable);
-    document.getElementById("btnExportReport").addEventListener("click", exportIncidentReport);
-    document.getElementById("tabBtnFlow").addEventListener("click", () => switchVizTab("flow"));
-    document.getElementById("tabBtnTopology").addEventListener("click", () => switchVizTab("topology"));
-    document.getElementById("tabBtnOsi").addEventListener("click", () => switchVizTab("osi"));
+    function exportHandoverReport() {
+      const now = new Date();
+      const nowStr = now.toLocaleString("ko-KR");
+      const nowMs = now.getTime();
+
+      const unreviewedList = sortAlerts(
+        (alertsData || []).filter(a => (a.verdict || "UNREVIEWED") === "UNREVIEWED"),
+        "priority"
+      );
+      const overdueCount = unreviewedList.filter(a => calcSlaInfo(a, nowMs).isOverdue).length;
+
+      const attackerMap = new Map();
+      const sevRank = { SEV1: 1, SEV2: 2, SEV3: 3, SEV4: 4 };
+
+      (alertsData || []).forEach(a => {
+        const ip = a.src_ip || "UNKNOWN";
+        if (!attackerMap.has(ip)) {
+          attackerMap.set(ip, {
+            ip,
+            totalCount: 0,
+            unreviewedCount: 0,
+            highestSev: "SEV4",
+            categories: new Set(),
+            targets: new Set()
+          });
+        }
+        const entry = attackerMap.get(ip);
+        entry.totalCount += 1;
+        if ((a.verdict || "UNREVIEWED") === "UNREVIEWED") entry.unreviewedCount += 1;
+        if ((sevRank[a.severity] || 4) < (sevRank[entry.highestSev] || 4)) {
+          entry.highestSev = a.severity;
+        }
+        if (a.category) entry.categories.add(String(a.category).toUpperCase());
+        if (a.dest_ip) entry.targets.add(`${a.dest_ip}:${a.dest_port ?? "-"}`);
+      });
+
+      let md = `# Mini-SIEM 근무 교대 인수인계 보고서 (Shift Handover)\n\n`;
+      md += `- **인수인계 기준 시각**: ${nowStr}\n`;
+      md += `- **관제 시스템 상태**: ${isMonitoringActive ? "🟢 정상 가동 중 (ON)" : "⏸️ 일시중지 상태 (OFF)"}\n`;
+      md += `- **실습망 모니터링 대역**: 172.28.0.0/24\n\n`;
+
+      md += `## 1. 인계 요약 (Executive Handover Summary)\n\n`;
+      md += `| 지표 항목 | 현재 수치 | 비고 |\n|---|---|---|\n`;
+      md += `| **활성 대기 경보** | ${alertsData.length}건 | 메인 대시보드 기준 |\n`;
+      md += `| **미검토(UNREVIEWED) 잔여** | **${unreviewedList.length}건** | 다음 근무조 최우선 트리아지 대상 |\n`;
+      md += `| **SLA 목표 시간 초과** | **${overdueCount}건** | 초동 분석 목표 시간 경과 |\n`;
+      md += `| **진행 중 공격자(출발지 IP)** | ${attackerMap.size}개 호스트 | 현재 임시 격리 중: ${containedIps.size}개 |\n`;
+      md += `| **히스토리 아카이빙 누적** | ${historyAlertsMap.size}건 | [히스토리] 뷰 보관 완료 |\n\n---\n\n`;
+
+      md += `## 2. 미처리(UNREVIEWED) 최우선 조치 대상 (SLA 임박순)\n\n`;
+      if (unreviewedList.length === 0) {
+        md += `_현재 미검토 상태인 잔여 경보가 없습니다._\n\n`;
+      } else {
+        md += `| 우선순위 | 발생 시각 | 심각도 | SLA 상태 | 카테고리 (SID) | 출발지 → 목적지 | 시그니처 |\n`;
+        md += `|---|---|---|---|---|---|---|\n`;
+        unreviewedList.forEach((a, idx) => {
+          const sla = calcSlaInfo(a, nowMs);
+          const slaTag = sla.isOverdue ? `⚠️ ${sla.label}` : sla.label;
+          md += `| ${idx + 1} | ${String(a.timestamp || "-").slice(11, 19)} | **${a.severity || "SEV4"}** | ${slaTag} | ${String(a.category || "-").toUpperCase()} (${a.sid ?? "-"}) | \`${a.src_ip || "-"}\` → \`${a.dest_ip || "-"}:${a.dest_port ?? "-"}\` | ${a.signature || "-"} |\n`;
+        });
+        md += `\n`;
+      }
+
+      md += `## 3. 진행 중 공격자(출발지 IP) 현황 및 임시 격리 상태\n\n`;
+      if (attackerMap.size === 0) {
+        md += `_활성 목록에 식별된 공격자 IP가 없습니다._\n\n`;
+      } else {
+        md += `| 출발지 IP | 최고 심각도 | 탐지 건수 (미검토) | 탐지된 공격 유형 | 표적 자산 | 임시 격리 상태 |\n`;
+        md += `|---|---|---|---|---|---|\n`;
+        attackerMap.forEach(att => {
+          let containmentText = "미격리 (정상 통신)";
+          if (isIpContained(att.ip)) {
+            const remSec = getRemainingSec(att.ip);
+            const mm = String(Math.floor(remSec / 60)).padStart(2, "0");
+            const ss = String(remSec % 60).padStart(2, "0");
+            containmentText = `🔒 임시 격리 중 (${mm}:${ss} 후 자동 해제)`;
+          }
+          md += `| \`${att.ip}\` | **${att.highestSev}** | ${att.totalCount}건 (${att.unreviewedCount}건) | ${Array.from(att.categories).join(", ")} | ${Array.from(att.targets).join(", ")} | ${containmentText} |\n`;
+        });
+        md += `\n`;
+      }
+
+      md += `## 4. 직전 근무조 주요 알림 및 대응 이력 (최근 10건)\n\n`;
+      const recentLogs = webNotificationFeed.slice(0, 10);
+      if (recentLogs.length === 0) {
+        md += `_기록된 알림 및 임시 대응 이력이 없습니다._\n\n`;
+      } else {
+        recentLogs.forEach(log => {
+          md += `- **[${log.time}] (${log.channel})** ${log.title} — ${log.description}\n`;
+        });
+        md += `\n`;
+      }
+
+      const blob = new Blob([md], { type: "text/markdown;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      const stamp = now.toISOString().slice(0, 16).replace("T", "_").replace(":", "");
+      link.href = url;
+      link.download = `mini-siem-handover-${stamp}.md`;
+      link.click();
+      URL.revokeObjectURL(url);
+
+      setStatus(`✅ 근무 교대 인수인계 보고서(mini-siem-handover-${stamp}.md) 다운로드 완료`);
+    }
+
+    function toggleMonitoringState() {
+      isMonitoringActive = !isMonitoringActive;
+      const btn = document.getElementById("btnToggleMonitoring");
+
+      if (isMonitoringActive) {
+        if (btn) {
+          btn.setAttribute("aria-pressed", "true");
+          btn.textContent = "🟢 관제 현황: ON";
+          btn.className = "bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/50 text-emerald-300 text-xs font-bold px-3 py-2 rounded-lg transition";
+        }
+        pushWebNotification({
+          title: "🟢 실시간 관제 재개 (ON)",
+          description: "5초 주기 경보 폴링 및 고위험 자동 알림이 다시 활성화되었습니다.",
+          color: 1096065
+        }, "관제 제어");
+        startPolling();
+      } else {
+        if (pollingTimer) {
+          clearInterval(pollingTimer);
+          pollingTimer = null;
+        }
+        if (btn) {
+          btn.setAttribute("aria-pressed", "false");
+          btn.textContent = "⏸️ 관제 현황: OFF";
+          btn.className = "bg-amber-600/20 hover:bg-amber-600/30 border border-amber-500/50 text-amber-300 text-xs font-bold px-3 py-2 rounded-lg transition";
+        }
+        pushWebNotification({
+          title: "⏸️ 실시간 관제 일시중지 (OFF)",
+          description: "점검/심층 분석을 위해 자동 폴링과 신규 알람 발송이 일시 중단되었습니다.",
+          color: 16098851
+        }, "관제 제어");
+        setStatus("⏸️ 관제 현황이 OFF 상태입니다. (5초 자동 갱신 및 자동 알람 일시중지)", true);
+      }
+    }
 
     // ==========================================
     // 7. 분석 통계 모듈 (1~4순위 통합 + 메인 탭 전환)
@@ -2508,22 +3207,6 @@
       if (!isSoc) renderAnalyticsDashboard();
     }
 
-    document.getElementById("mainTabSoc")?.addEventListener("click", () => switchMainView("soc"));
-    document.getElementById("mainTabAnalytics")?.addEventListener("click", () => switchMainView("analytics"));
-
-    document.getElementById("btnTimelineMin")?.addEventListener("click", () => {
-      timelineGranularity = "minute";
-      document.getElementById("btnTimelineMin").className = "px-2.5 py-1 rounded font-semibold bg-sky-600 text-white transition";
-      document.getElementById("btnTimelineHour").className = "px-2.5 py-1 rounded font-semibold text-slate-400 hover:text-white transition";
-      renderTimelineChart(alertsData);
-    });
-    document.getElementById("btnTimelineHour")?.addEventListener("click", () => {
-      timelineGranularity = "hour";
-      document.getElementById("btnTimelineHour").className = "px-2.5 py-1 rounded font-semibold bg-sky-600 text-white transition";
-      document.getElementById("btnTimelineMin").className = "px-2.5 py-1 rounded font-semibold text-slate-400 hover:text-white transition";
-      renderTimelineChart(alertsData);
-    });
-
     // ==========================================
     // 8. 알림봇(웹 토스트 + Audit Feed + Discord) & 승인 기반 임시 대응(SOAR 시뮬레이션)
     // ==========================================
@@ -2736,7 +3419,7 @@
     }
 
     async function checkAndAutoNotifySev1(items) {
-      if (!isAutoNotifyEnabled()) return;
+      if (!isAutoNotifyEnabled() || !isMonitoringActive) return;
       for (const alert of (items || [])) {
         const key = String(alert.id);
         if (alert.severity === "SEV1" && !notifiedAlertIds.has(key)) {
@@ -2746,15 +3429,135 @@
       }
     }
 
-    document.getElementById("btnAlertBotModal")?.addEventListener("click", () => {
+    // ==========================================
+    // 9. 이벤트 바인딩 & 주기 타이머
+    // ==========================================
+    // 필터, 검색, 보고서, 탭 전환
+    document.getElementById("filterCategory").addEventListener("change", renderAlertTable);
+    document.getElementById("filterSeverity").addEventListener("change", renderAlertTable);
+    document.getElementById("filterVerdict").addEventListener("change", renderAlertTable);
+    document.getElementById("searchKeyword").addEventListener("input", renderAlertTable);
+    document.getElementById("btnExportReport").addEventListener("click", exportIncidentReport);
+    document.getElementById("btnExportHandover").addEventListener("click", exportHandoverReport);
+    document.getElementById("btnToggleMonitoring").addEventListener("click", toggleMonitoringState);
+
+    document.getElementById("tabBtnFlow").addEventListener("click", () => switchVizTab("flow"));
+    document.getElementById("tabBtnTopology").addEventListener("click", () => switchVizTab("topology"));
+    document.getElementById("tabBtnOsi").addEventListener("click", () => switchVizTab("osi"));
+    document.getElementById("btnExpandViz").addEventListener("click", openExpandedVizModal);
+    document.getElementById("btnCloseVizExpandModal").addEventListener("click", () => {
+      document.getElementById("vizExpandModal").classList.add("hidden");
+    });
+
+    document.getElementById("mainTabSoc").addEventListener("click", () => switchMainView("soc"));
+    document.getElementById("mainTabAnalytics").addEventListener("click", () => switchMainView("analytics"));
+
+    document.getElementById("btnTimelineMin").addEventListener("click", () => {
+      timelineGranularity = "minute";
+      document.getElementById("btnTimelineMin").className = "px-2.5 py-1 rounded font-semibold bg-sky-600 text-white transition";
+      document.getElementById("btnTimelineHour").className = "px-2.5 py-1 rounded font-semibold text-slate-400 hover:text-white transition";
+      renderTimelineChart(alertsData);
+    });
+    document.getElementById("btnTimelineHour").addEventListener("click", () => {
+      timelineGranularity = "hour";
+      document.getElementById("btnTimelineHour").className = "px-2.5 py-1 rounded font-semibold bg-sky-600 text-white transition";
+      document.getElementById("btnTimelineMin").className = "px-2.5 py-1 rounded font-semibold text-slate-400 hover:text-white transition";
+      renderTimelineChart(alertsData);
+    });
+
+    // [P0] 확대 보기 & 실시간 캡처 CLI 복사
+    document.getElementById("btnZoomToggle").addEventListener("click", () => {
+      isZoomMode = !isZoomMode;
+      document.body.classList.toggle("soc-zoom-mode", isZoomMode);
+      const btn = document.getElementById("btnZoomToggle");
+      btn.setAttribute("aria-pressed", String(isZoomMode));
+      btn.textContent = isZoomMode ? "🔍 확대 보기: ON" : "🔍 확대 보기: OFF";
+      btn.className = isZoomMode
+        ? "bg-sky-600 hover:bg-sky-500 border border-sky-500 text-white text-xs font-semibold px-3 py-2 rounded-lg transition"
+        : "bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-semibold px-3 py-2 rounded-lg transition";
+    });
+
+    document.getElementById("btnCopyCaptureStart").addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText("curl -X POST http://localhost:8000/api/live/start");
+        setStatus("📋 실시간 캡처 시작 명령을 클립보드에 복사했습니다.");
+      } catch (_) {
+        setStatus("클립보드 복사 권한이 차단되어 있습니다.", true);
+      }
+    });
+
+    document.getElementById("btnCopyCaptureStop").addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText("curl -X POST http://localhost:8000/api/live/stop");
+        setStatus("📋 실시간 캡처 중지 명령을 클립보드에 복사했습니다.");
+      } catch (_) {
+        setStatus("클립보드 복사 권한이 차단되어 있습니다.", true);
+      }
+    });
+
+    // [P1-1] 우선순위 정렬 & 중복 그룹핑 토글
+    document.getElementById("btnToggleSort").addEventListener("click", () => {
+      sortMode = sortMode === "priority" ? "latest" : "priority";
+      const btn = document.getElementById("btnToggleSort");
+      if (sortMode === "priority") {
+        btn.textContent = "🔥 정렬: 우선순위순 (SLA)";
+        btn.className = "px-2.5 py-1 rounded-md font-semibold bg-amber-600/20 border border-amber-500/40 text-amber-300 hover:bg-amber-600/30 transition";
+      } else {
+        btn.textContent = "🕒 정렬: 최신순";
+        btn.className = "px-2.5 py-1 rounded-md font-semibold bg-slate-800 border border-slate-700 text-slate-300 hover:text-white transition";
+      }
+      renderAlertTable();
+    });
+
+    document.getElementById("btnToggleGrouping").addEventListener("click", () => {
+      isGroupingEnabled = !isGroupingEnabled;
+      const btn = document.getElementById("btnToggleGrouping");
+      btn.setAttribute("aria-pressed", String(isGroupingEnabled));
+      if (isGroupingEnabled) {
+        btn.textContent = "📦 중복 묶기: ON";
+        btn.className = "px-2.5 py-1 rounded-md font-semibold bg-sky-600/20 border border-sky-500/40 text-sky-300 hover:bg-sky-600/30 transition";
+      } else {
+        btn.textContent = "📦 중복 묶기: OFF";
+        btn.className = "px-2.5 py-1 rounded-md font-semibold bg-slate-800 border border-slate-700 text-slate-300 hover:text-white transition";
+      }
+      renderAlertTable();
+    });
+
+    // [P1-2] 로그 정리 & 히스토리 모달
+    document.getElementById("btnClearLogs").addEventListener("click", clearActiveAlertsToHistory);
+    document.getElementById("btnHistoryModal").addEventListener("click", () => {
+      renderHistoryModal();
+      document.getElementById("historyModal").classList.remove("hidden");
+    });
+    document.getElementById("btnCloseHistoryModal").addEventListener("click", () => {
+      document.getElementById("historyModal").classList.add("hidden");
+    });
+    document.getElementById("historySearchInput").addEventListener("input", renderHistoryModal);
+    document.getElementById("btnRestoreHistory").addEventListener("click", restoreAllHistoryAlerts);
+
+    document.getElementById("btnHistorySortDesc").addEventListener("click", () => {
+      historySortOrder = "desc";
+      document.getElementById("btnHistorySortDesc").className = "px-2.5 py-1.5 rounded-lg font-semibold bg-sky-600 text-white transition";
+      document.getElementById("btnHistorySortAsc").className = "px-2.5 py-1.5 rounded-lg font-semibold bg-slate-800 text-slate-300 hover:text-white transition";
+      renderHistoryModal();
+    });
+    document.getElementById("btnHistorySortAsc").addEventListener("click", () => {
+      historySortOrder = "asc";
+      document.getElementById("btnHistorySortAsc").className = "px-2.5 py-1.5 rounded-lg font-semibold bg-sky-600 text-white transition";
+      document.getElementById("btnHistorySortDesc").className = "px-2.5 py-1.5 rounded-lg font-semibold bg-slate-800 text-slate-300 hover:text-white transition";
+      renderHistoryModal();
+    });
+
+    // 알림봇 설정 & Audit Feed 모달
+    document.getElementById("btnAlertBotModal").addEventListener("click", () => {
       document.getElementById("discordWebhookInput").value = getWebhookUrl();
       document.getElementById("autoNotifySev1").checked = isAutoNotifyEnabled();
       document.getElementById("alertBotModal").classList.remove("hidden");
     });
-    document.getElementById("btnCloseBotModal")?.addEventListener("click", () => {
+    document.getElementById("btnCloseBotModal").addEventListener("click", () => {
       document.getElementById("alertBotModal").classList.add("hidden");
     });
-    document.getElementById("btnSaveBotConfig")?.addEventListener("click", () => {
+    document.getElementById("btnSaveBotConfig").addEventListener("click", () => {
       const url = document.getElementById("discordWebhookInput").value.trim();
       const autoSev1 = document.getElementById("autoNotifySev1").checked;
       sessionStorage.setItem("minisiem_discord_webhook", url);
@@ -2762,7 +3565,7 @@
       document.getElementById("alertBotModal").classList.add("hidden");
       setStatus("✅ 알림봇 설정이 세션에 저장되었습니다.");
     });
-    document.getElementById("btnTestDiscord")?.addEventListener("click", async () => {
+    document.getElementById("btnTestDiscord").addEventListener("click", async () => {
       const url = document.getElementById("discordWebhookInput").value.trim();
       sessionStorage.setItem("minisiem_discord_webhook", url);
       const ok = await sendDiscordWebhook({
@@ -2774,24 +3577,25 @@
       if (ok && url) setStatus("✅ Discord 및 웹 화면에 테스트 알림을 발송했습니다.");
     });
 
-    document.getElementById("btnNotifFeedModal")?.addEventListener("click", () => {
+    document.getElementById("btnNotifFeedModal").addEventListener("click", () => {
       renderNotifFeedList();
       document.getElementById("notifFeedModal").classList.remove("hidden");
     });
-    document.getElementById("btnCloseNotifFeed")?.addEventListener("click", () => {
+    document.getElementById("btnCloseNotifFeed").addEventListener("click", () => {
       document.getElementById("notifFeedModal").classList.add("hidden");
     });
-    document.getElementById("btnCloseNotifFeedBottom")?.addEventListener("click", () => {
+    document.getElementById("btnCloseNotifFeedBottom").addEventListener("click", () => {
       document.getElementById("notifFeedModal").classList.add("hidden");
     });
-    document.getElementById("btnClearNotifFeed")?.addEventListener("click", () => {
+    document.getElementById("btnClearNotifFeed").addEventListener("click", () => {
       webNotificationFeed.length = 0;
       const countEl = document.getElementById("notifFeedCount");
       if (countEl) countEl.textContent = "0";
       renderNotifFeedList();
     });
 
-    document.getElementById("btnToggleContainment")?.addEventListener("click", async () => {
+    // SOAR 임시 차단 & 수동 알림 전송
+    document.getElementById("btnToggleContainment").addEventListener("click", async () => {
       const alert = alertsData.find(a => String(a.id) === String(selectedAlertId));
       if (!alert || !alert.src_ip) return;
       const ip = alert.src_ip;
@@ -2813,13 +3617,14 @@
       renderAlertTable();
     });
 
-    document.getElementById("btnSendDiscordAlert")?.addEventListener("click", async () => {
+    document.getElementById("btnSendDiscordAlert").addEventListener("click", async () => {
       const alert = alertsData.find(a => String(a.id) === String(selectedAlertId));
       if (!alert) return;
       const ok = await sendDiscordWebhook(buildAlertEmbed(alert));
       if (ok && getWebhookUrl()) setStatus(`✅ 경보 #${alert.id} 웹 및 Discord 알림 발송 완료`);
     });
 
+    // 1초마다 격리 타이머 갱신
     setInterval(() => {
       if (selectedAlertId !== null) {
         const alert = alertsData.find(a => String(a.id) === String(selectedAlertId));
