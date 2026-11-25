@@ -5,7 +5,7 @@ import os
 import sqlite3
 import subprocess
 import uuid
-from contextlib import closing
+from contextlib import asynccontextmanager, closing
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional
@@ -15,11 +15,20 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
+from . import live_capture
 from .eve_parser import extract_event_types, mask_text, parse_eve
 
 MAX_UPLOAD_BYTES = 20 * 1024 * 1024
 ROOT = Path(__file__).resolve().parent.parent
-app = FastAPI()
+
+@asynccontextmanager
+async def lifespan(_app):
+    if live_capture.enabled():  # optional, off unless LIVE_CAPTURE_ENABLED=1
+        init_db()
+        live_capture.start(db_path, insert_alerts)
+    yield
+
+app = FastAPI(lifespan=lifespan)
 origins = [x.strip() for x in os.getenv("ALLOWED_ORIGINS", "http://localhost:5500,http://127.0.0.1:5500").split(",") if x.strip()]
 origins = [origin for origin in origins if origin != "*"]
 app.add_middleware(CORSMiddleware, allow_origins=origins, allow_methods=["*"], allow_headers=["*"], allow_credentials=True)
@@ -141,40 +150,44 @@ def init_db():
         db.execute("CREATE TABLE IF NOT EXISTS ingest_meta (key TEXT PRIMARY KEY, value TEXT)")
         db.commit()
 
+INSERT_KEYS = (
+    "timestamp",
+    "flow_id",
+    "sid",
+    "category",
+    "signature",
+    "mitre_id",
+    "src_ip",
+    "dest_ip",
+    "dest_port",
+    "http_status",
+    "severity",
+    "is_confirmed_risk",
+    "pii_masked",
+    "raw_url",
+)
+INSERT_SQL = (
+    "INSERT OR IGNORE INTO alerts "
+    "(timestamp,flow_id,sid,category,signature,mitre_id,src_ip,dest_ip,dest_port,http_status,severity,is_confirmed_risk,pii_masked,raw_url) "
+    "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
+)
+
+def insert_alerts(db, rows):
+    stored = 0
+    for row in rows:
+        cursor = db.execute(INSERT_SQL, tuple(row[k] for k in INSERT_KEYS))
+        if cursor.rowcount > 0:
+            stored += 1
+    return stored
+
 def ingest_eve(path):
     init_db()
     rows, skipped = parse_eve(path) if Path(path).exists() else ([], 0)
     event_types = extract_event_types(path) if Path(path).exists() else set()
     sources = [f"suricata_{et}" for et in event_types]
 
-    keys = (
-        "timestamp",
-        "flow_id",
-        "sid",
-        "category",
-        "signature",
-        "mitre_id",
-        "src_ip",
-        "dest_ip",
-        "dest_port",
-        "http_status",
-        "severity",
-        "is_confirmed_risk",
-        "pii_masked",
-        "raw_url",
-    )
-    sql = (
-        "INSERT OR IGNORE INTO alerts "
-        "(timestamp,flow_id,sid,category,signature,mitre_id,src_ip,dest_ip,dest_port,http_status,severity,is_confirmed_risk,pii_masked,raw_url) "
-        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
-    )
-
-    stored = 0
     with closing(sqlite3.connect(db_path())) as db:
-        for row in rows:
-            cursor = db.execute(sql, tuple(row[k] for k in keys))
-            if cursor.rowcount > 0:
-                stored += 1
+        stored = insert_alerts(db, rows)
 
         db.execute("DELETE FROM ingest_sources")
         for s in sources:
@@ -465,6 +478,10 @@ def update_triage(alert_id: int, payload: TriageUpdate):
         row = db.execute("SELECT * FROM alerts WHERE id = ?", (alert_id,)).fetchone()
 
     return build_alert_dict(row, playbooks)
+
+@app.get("/api/live/status")
+def live_status():
+    return live_capture.status()
 
 @app.get("/api/stats", response_model=StatsResult)
 def stats():

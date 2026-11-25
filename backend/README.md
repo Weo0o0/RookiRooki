@@ -9,6 +9,7 @@ WSL에서 `uvicorn backend.main:app --port 8000`으로 실행합니다. 테스�
 - `GET /api/alerts`: 탐지된 경보 목록 조회 (최신순 정렬, `severity` 필터, `limit`, `offset` 페이징).
 - `GET /api/alerts/{id}`: 특정 경보 상세 조회 (카테고리별 대응 플레이북 매칭 포함).
 - `PATCH /api/alerts/{id}/triage`: 경보 트리아지 정보 갱신 (`verdict`: TP/FP/UNREVIEWED, `confidence`: HIGH/MEDIUM/LOW, `observation`, `assessment`). 관찰 및 평가 입력 시 민감정보 마스킹 처리.
+- `GET /api/live/status`: (선택 기능, 기본 꺼짐) 라이브 캡처 상태와 Suricata 시작/중지 안내 문자열 조회. 읽기 전용이며 꺼져 있어도 `enabled: false`로 응답.
 - `GET /api/stats`: 전체 통계(전체 건수, 심각도별/카테고리별 건수, MITRE ATT&CK 커버리지) 및 로그 결측 탐지 사각지대 규칙(`blind_rules`) 목록 조회.
 
 ## 환경 변수 (기본값)
@@ -23,6 +24,9 @@ WSL에서 `uvicorn backend.main:app --port 8000`으로 실행합니다. 테스�
 - `SAMPLE_EVE_PATH`: `scenarios/sample_eve.json`
 - `PLAYBOOKS_PATH`: `scenarios/playbooks.json`
 - `RULE_CATALOG_PATH`: `rules/rule_catalog.json`
+- `LIVE_CAPTURE_ENABLED`: 없음(꺼짐). `1`일 때만 라이브 캡처 폴링 스레드 시작. 그 외 값은 모두 꺼짐 (팀 합의 후 사용, [docs/live_capture_guide.md](../docs/live_capture_guide.md))
+- `LIVE_EVE_PATH`: `backend/data/live/eve.json`
+- `LIVE_POLL_SECONDS`: `2`
 
 ## 데이터 파일 및 중복 제거 동작
 
