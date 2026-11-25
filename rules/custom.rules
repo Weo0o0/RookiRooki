@@ -7,3 +7,7 @@ alert http any any -> $HOME_NET any (msg:"MINI-SIEM XSS attempt in HTTP URI"; fl
 alert tcp any any -> 172.28.0.11 22 (msg:"MINI-SIEM SSH brute force - repeated connections to victim-pc:22"; flow:to_server; flags:S,12; threshold:type both, track by_src, count 4, seconds 60; classtype:attempted-user; sid:1000003; rev:2; metadata:mini_siem_category bruteforce, mitre_technique T1110.001;)
 # 1000004 portscan
 alert tcp any any -> $HOME_NET ![22,80] (msg:"MINI-SIEM Port scan - many SYNs to non-service ports"; flow:to_server; flags:S,12; threshold:type both, track by_src, count 20, seconds 10; classtype:network-scan; sid:1000004; rev:2; metadata:mini_siem_category portscan, mitre_technique T1046;)
+# 1000005 c2_beacon
+alert tcp any any -> $HOME_NET 8443 (msg:"MINI-SIEM C2 beacon - repeated connections to 8443"; flow:to_server; flags:S,12; threshold:type both, track by_src, count 5, seconds 30; classtype:trojan-activity; sid:1000005; rev:1; metadata:mini_siem_category c2_beacon, mitre_technique T1071.001;)
+# 1000006 ssrf
+alert http any any -> $HOME_NET any (msg:"MINI-SIEM SSRF internal URL in fetch parameter"; flow:established,to_server; http.uri; content:"/fetch?"; startswith; nocase; pcre:"/[?&]url=(?:https?|file|gopher)(?::|%3a)(?:\/|%2f){2}(?:[^\/@?\x23]*@)?(?:172\.28\.|127\.|localhost|10\.|192\.168\.|169\.254\.)/i"; classtype:web-application-attack; sid:1000006; rev:1; metadata:mini_siem_category ssrf, mitre_technique T1190;)
