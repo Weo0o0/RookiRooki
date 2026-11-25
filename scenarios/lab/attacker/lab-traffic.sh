@@ -28,4 +28,20 @@ hydra -l labuser -P /lab/passwords.txt -t 4 -w 3 "ssh://${PC}/" || true
 echo "[5] 포트 스캔 (SYN, 웹과 PC 모두 — README 범위)"
 nmap -sS -Pn -T4 -p 1-100 "${WEB}" "${PC}" || nmap -sT -Pn -T4 -p 1-100 "${WEB}" "${PC}"
 
+echo "[6] C2 beacon — victim-web:8443 30초 안 5회"
+for i in 1 2 3 4 5; do
+  echo "c2 connection ${i}"
+  curl -sS --connect-timeout 2 \
+    "http://${WEB}:8443/health" >/dev/null || true
+  sleep 6
+done
+
+echo "[7] SSRF — 내부 조회 성공 200"
+curl -sS -o /tmp/out_ssrf_ok.html -w "ssrf_success HTTP %{http_code}\n" \
+  "http://${WEB}/fetch?url=http%3A%2F%2F${WEB}%2Fhealth"
+
+echo "[8] SSRF — 내부 조회 실패 403"
+curl -sS -o /tmp/out_ssrf_fail.html -w "ssrf_failure HTTP %{http_code}\n" \
+  "http://${WEB}/fetch?url=http%3A%2F%2F${PC}%3A8080%2Fhealth"
+
 echo "실습 트래픽 생성 끝."
