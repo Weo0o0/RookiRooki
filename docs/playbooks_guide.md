@@ -44,7 +44,18 @@
       "block": "ufw insert 1 deny from {{SRC_IP}} to any port {{DEST_PORT}} proto tcp",                                                    // [차단] UFW 최상단 1번에 해당 웹 포트 차단 룰 삽입
       "rollback": "ufw delete deny from {{SRC_IP}} to any port {{DEST_PORT}} proto tcp"                                                    // [원복] UFW에 등록된 차단 정책 즉시 회수
     }
-  }
+  },
+  "analysis": [  // [분석] 필수. 경보 상세에 표시되는 확인 절차 목록
+    {
+      "title": "웹 컨테이너 접속 로그 확인",  // [제목] 확인 절차 이름
+      "where": "victim-web",  // [위치] 명령을 실행할 실습망 컨테이너
+      "command": "docker logs --since 5m victim-web | grep '{{SRC_IP}}'",  // [명령] 문자열 필수. {{SRC_IP}}, {{DEST_PORT}}는 프론트가 치환
+      "tokens": [  // [토큰] 비어 있지 않은 {token, desc} 목록
+        {"token": "victim-web", "desc": "실습용 웹 서버 컨테이너 이름입니다."},  // [토큰 해설] 명령어 구성 요소 설명
+        {"token": "{{SRC_IP}}", "desc": "경보에 나온 출발지(공격자로 의심되는) 주소입니다."}  // [토큰 해설] 명령어 구성 요소 설명
+      ]
+    }
+  ]
 }
 ```
 
@@ -71,7 +82,18 @@
       "block": "ufw insert 1 deny from {{SRC_IP}} to any port {{DEST_PORT}} proto tcp",                                                    // [차단] UFW 최상단 1번에 웹 포트 접근 거부 룰 삽입
       "rollback": "ufw delete deny from {{SRC_IP}} to any port {{DEST_PORT}} proto tcp"                                                    // [원복] 등록된 차단 룰 삭제
     }
-  }
+  },
+  "analysis": [  // [분석] 필수. 경보 상세에 표시되는 확인 절차 목록
+    {
+      "title": "XSS 스크립트 요청 로그 확인",  // [제목] 확인 절차 이름
+      "where": "victim-web",  // [위치] 명령을 실행할 실습망 컨테이너
+      "command": "docker logs --since 5m victim-web | grep '{{SRC_IP}}'",  // [명령] 문자열 필수. {{SRC_IP}}, {{DEST_PORT}}는 프론트가 치환
+      "tokens": [  // [토큰] 비어 있지 않은 {token, desc} 목록
+        {"token": "victim-web", "desc": "실습용 웹 서버 컨테이너 이름입니다."},  // [토큰 해설] 명령어 구성 요소 설명
+        {"token": "{{SRC_IP}}", "desc": "경보에 나온 출발지(공격자로 의심되는) 주소입니다."}  // [토큰 해설] 명령어 구성 요소 설명
+      ]
+    }
+  ]
 }
 ```
 
@@ -98,7 +120,19 @@
       "block": "ufw insert 1 deny from {{SRC_IP}} to any port {{DEST_PORT}} proto tcp",                                                    // [차단] UFW 최상단 1번에 SSH 포트 거부 룰 삽입
       "rollback": "ufw delete deny from {{SRC_IP}} to any port {{DEST_PORT}} proto tcp"                                                    // [원복] 등록된 SSH 차단 룰 삭제
     }
-  }
+  },
+  "analysis": [  // [분석] 필수. 경보 상세에 표시되는 확인 절차 목록
+    {
+      "title": "SSH 인증 실패 기록 확인",  // [제목] 확인 절차 이름
+      "where": "victim-pc",  // [위치] 명령을 실행할 실습망 컨테이너
+      "command": "docker logs --since 5m victim-pc 2>&1 | grep '{{SRC_IP}}'",  // [명령] 문자열 필수. {{SRC_IP}}, {{DEST_PORT}}는 프론트가 치환
+      "tokens": [  // [토큰] 비어 있지 않은 {token, desc} 목록
+        {"token": "victim-pc", "desc": "SSH 서비스(22번 포트)가 동작 중인 PC 컨테이너입니다."},  // [토큰 해설] 명령어 구성 요소 설명
+        {"token": "2>&1", "desc": "sshd는 로그를 표준 오류(stderr)로 내보내므로 grep으로 넘기기 위해 표준 출력에 합칩니다."},  // [토큰 해설] 명령어 구성 요소 설명
+        {"token": "{{SRC_IP}}", "desc": "접속을 시도한 출발지 주소입니다."}  // [토큰 해설] 명령어 구성 요소 설명
+      ]
+    }
+  ]
 }
 ```
 
@@ -125,7 +159,18 @@
       "block": "ufw insert 1 deny from {{SRC_IP}} to any",                                                                                 // [차단] UFW 최상단에 해당 IP 발 모든 인바운드 거부 룰 삽입
       "rollback": "ufw delete deny from {{SRC_IP}} to any"                                                                                 // [원복] 등록된 IP 차단 룰 삭제
     }
-  }
+  },
+  "analysis": [  // [분석] 필수. 경보 상세에 표시되는 확인 절차 목록
+    {
+      "title": "출발지 접속 흔적 확인",  // [제목] 확인 절차 이름
+      "where": "victim-web",  // [위치] 명령을 실행할 실습망 컨테이너
+      "command": "docker logs --since 5m victim-web | grep '{{SRC_IP}}'",  // [명령] 문자열 필수. {{SRC_IP}}, {{DEST_PORT}}는 프론트가 치환
+      "tokens": [  // [토큰] 비어 있지 않은 {token, desc} 목록
+        {"token": "victim-web", "desc": "실습용 웹 서버 컨테이너 이름입니다."},  // [토큰 해설] 명령어 구성 요소 설명
+        {"token": "{{SRC_IP}}", "desc": "스캔을 시도한 출발지 주소입니다."}  // [토큰 해설] 명령어 구성 요소 설명
+      ]
+    }
+  ]
 }
 ```
 
@@ -152,7 +197,19 @@
       "block": "ufw insert 1 deny from {{SRC_IP}} to any port {{DEST_PORT}} proto tcp",     // [차단] 출발지 IP의 목적지 포트 차단
       "rollback": "ufw delete deny from {{SRC_IP}} to any port {{DEST_PORT}} proto tcp"     // [원복] UFW 차단 룰 삭제
     }
-  }
+  },
+  "analysis": [  // [분석] 필수. 경보 상세에 표시되는 확인 절차 목록
+    {
+      "title": "C2로 의심되는 8443 접속 흔적 확인",  // [제목] 확인 절차 이름
+      "where": "victim-web",  // [위치] 명령을 실행할 실습망 컨테이너
+      "command": "docker logs --since 5m victim-web | grep '{{SRC_IP}}'",  // [명령] 문자열 필수. {{SRC_IP}}, {{DEST_PORT}}는 프론트가 치환
+      "tokens": [  // [토큰] 비어 있지 않은 {token, desc} 목록
+        {"token": "victim-web", "desc": "목적지 웹 서버 컨테이너입니다. attacker(172.28.0.100)에서 victim-web(172.28.0.10)의 8443/tcp로 갑니다."},  // [토큰 해설] 명령어 구성 요소 설명
+        {"token": "{{SRC_IP}}", "desc": "경보에 나온 출발지 주소입니다. 확정 시나리오에서는 attacker 172.28.0.100입니다."},  // [토큰 해설] 명령어 구성 요소 설명
+        {"token": "{{DEST_PORT}}", "desc": "목적지 포트입니다. 확정 시나리오에서는 8443입니다."}  // [토큰 해설] 명령어 구성 요소 설명
+      ]
+    }
+  ]
 }
 ```
 
@@ -179,6 +236,44 @@
       "block": "ufw insert 1 deny from {{SRC_IP}} to any port {{DEST_PORT}} proto tcp",     // [차단] 출발지 IP의 목적지 포트 차단
       "rollback": "ufw delete deny from {{SRC_IP}} to any port {{DEST_PORT}} proto tcp"     // [원복] UFW 차단 룰 삭제
     }
-  }
+  },
+  "analysis": [  // [분석] 필수. 경보 상세에 표시되는 확인 절차 목록
+    {
+      "title": "SSRF fetch 요청 흔적 확인",  // [제목] 확인 절차 이름
+      "where": "victim-web",  // [위치] 명령을 실행할 실습망 컨테이너
+      "command": "docker logs --since 5m victim-web | grep '{{SRC_IP}}'",  // [명령] 문자열 필수. {{SRC_IP}}, {{DEST_PORT}}는 프론트가 치환
+      "tokens": [  // [토큰] 비어 있지 않은 {token, desc} 목록
+        {"token": "victim-web", "desc": "실습용 웹 서버 컨테이너 이름입니다."},  // [토큰 해설] 명령어 구성 요소 설명
+        {"token": "{{SRC_IP}}", "desc": "요청을 보낸 출발지 주소입니다."}  // [토큰 해설] 명령어 구성 요소 설명
+      ]
+    },
+    {
+      "title": "SSRF fetch 경로 로그 확인",  // [제목] 확인 절차 이름
+      "where": "victim-web",  // [위치] 명령을 실행할 실습망 컨테이너
+      "command": "docker logs --since 5m victim-web | grep '/fetch?url='",  // [명령] 문자열 필수. {{SRC_IP}}, {{DEST_PORT}}는 프론트가 치환
+      "tokens": [  // [토큰] 비어 있지 않은 {token, desc} 목록
+        {"token": "victim-web", "desc": "실습용 웹 서버 컨테이너 이름입니다."},  // [토큰 해설] 명령어 구성 요소 설명
+        {"token": "/fetch?url=", "desc": "확정된 SSRF 요청 경로입니다."}  // [토큰 해설] 명령어 구성 요소 설명
+      ]
+    }
+  ]
 }
 ```
+
+---
+
+## 3. `analysis` 필드 (6종 모두 필수)
+
+`sqli`, `xss`, `bruteforce`, `portscan`, `c2_beacon`, `ssrf` 6개 플레이북은 모두 `analysis` 배열을 가져야 합니다. 경보 상세 화면의 "분석" 패널이 이 값을 그대로 보여 줍니다. 위 JSON 예시는 `scenarios/playbooks.json`과 동일한 `analysis`를 포함합니다.
+
+| 필드 | 타입 | 설명 |
+| :--- | :--- | :--- |
+| `title` | 문자열 | 확인 절차 이름 |
+| `where` | 문자열 | 명령을 실행할 실습망 컨테이너 (`victim-web`, `victim-pc`, `attacker`) |
+| `command` | 문자열 (필수) | 실행 예시 명령. `{{SRC_IP}}`, `{{DEST_PORT}}` 사용 가능 |
+| `tokens` | `[{token, desc}]` (필수, 비어 있지 않음) | 명령어 구성 요소와 그 설명 |
+
+- **백엔드 정규화** (`backend/main.py`의 `build_alert_dict`): `analysis` 항목이 객체가 아니거나, `command`가 문자열이 아니거나, `tokens`가 리스트가 아니면 그 항목은 버립니다. 남은 항목의 `title`/`where`/`command`/`token`/`desc`는 마스킹 처리를 거치므로 민감값은 `[MASKED]`로 바뀝니다. `analysis`가 없으면 빈 배열이 내려갑니다.
+- **프론트엔드 치환**: 분석 명령의 `{{SRC_IP}}`, `{{DEST_PORT}}`만 경보의 `src_ip`, `dest_port` 값으로 치환합니다(안전 문자만 허용).
+- **작성 규칙**: IP는 실습망 `172.28.0.0/24`만 사용하고, 컨테이너 이름·포트·경로는 `scenarios/lab/docker-compose.yml`과 `victim-web/app.py`에 실제로 있는 값만 씁니다. 민감한 값은 `[MASKED]`로 적습니다.
+- **주의**: `actions`의 `block`(및 `rollback`) 명령은 안내용 예시일 뿐이며 시스템이 실행하지 않습니다. `analysis`의 `command`도 화면에 표시만 합니다. 실행 여부는 담당자가 직접 판단합니다.
