@@ -1,6 +1,6 @@
 # Mini-SIEM 시스템 구상도
 
-이 문서는 04조 Mini-SIEM의 구성 요소, 실습망, 데이터 흐름, 탐지 규칙, 데이터 저장 구조를 정리합니다. 제품 개요와 일정은 [README.md](../README.md)를 참고하세요. **코드는 아직 구현 전**이며, 여기서는 팀이 합의한 설계만 적습니다.
+이 문서는 04조 Mini-SIEM의 구성 요소, 실습망, 데이터 흐름, 탐지 규칙, 데이터 저장 구조를 정리합니다. 제품 개요와 일정은 [README.md](../README.md)를 참고하세요. 백엔드(FastAPI)와 프론트엔드(`frontend/index.html`)는 `main`에 구현되어 있으며, 여기서는 팀이 합의한 설계를 정리합니다.
 
 Stage 1(이번 4일)은 격리된 Docker 실습망에서 tcpdump로 녹화된 pcap을 업로드해 Suricata가 오프라인으로 분석하는 경로입니다. Stage 2(브리지에 Suricata를 상시 배치)는 Backlog입니다. 시스템이 차단 명령을 실행하는 기능도 Backlog이며, Stage 1의 차단은 대시보드에 표시하는 명령 안내뿐입니다.
 
