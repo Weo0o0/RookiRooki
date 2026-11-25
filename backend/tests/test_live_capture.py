@@ -1,5 +1,7 @@
+﻿import ipaddress
 import json
 import sqlite3
+import subprocess
 import threading
 from pathlib import Path
 from fastapi.testclient import TestClient
@@ -103,3 +105,54 @@ def test_status_when_enabled_has_guidance(monkeypatch, tmp_path):
     assert body["enabled"] is True and body["eve_path"] == str(tmp_path / "eve.json")
     assert "-i br-minisiem" in body["start_command"] and "net 172.28.0.0/24" in body["start_command"]
     assert "pkill" in body["stop_command"]
+
+def _sample_upload_client(monkeypatch, tmp_path):
+    monkeypatch.delenv("LIVE_CAPTURE_ENABLED", raising=False)
+    monkeypatch.setenv("DB_PATH", str(tmp_path / "a.db"))
+    monkeypatch.setenv("SAMPLE_EVE_PATH", str(main.ROOT / "scenarios" / "sample_eve.json"))
+    monkeypatch.setenv("UPLOAD_DIR", str(tmp_path / "uploads"))
+    monkeypatch.setenv("SURICATA_OUT_ROOT", str(tmp_path / "out"))
+    monkeypatch.setenv("RULES_PATH", str(tmp_path / "rules"))
+    (tmp_path / "rules").write_text("rules")
+    return TestClient(main.app)
+
+def _has_state_table(tmp_path):
+    with sqlite3.connect(tmp_path / "a.db") as db:
+        return db.execute("SELECT 1 FROM sqlite_master WHERE name = 'live_capture_state'").fetchone() is not None
+
+def test_flag_off_sample_ingest_stores_12_alerts(monkeypatch, tmp_path):
+    c = _sample_upload_client(monkeypatch, tmp_path)
+    assert c.post("/api/ingest/sample").json()["alerts_stored"] == 12
+    assert c.get("/api/live/status").json()["enabled"] is False
+    assert not _has_state_table(tmp_path)
+
+def test_flag_off_pcap_upload_on_empty_db_creates_no_live_table(monkeypatch, tmp_path):
+    c = _sample_upload_client(monkeypatch, tmp_path)
+    def run(args, **kwargs):
+        out = Path(args[args.index("-l") + 1])
+        (out / "eve.json").write_bytes((main.ROOT / "scenarios" / "sample_eve.json").read_bytes())
+        return subprocess.CompletedProcess(args, 0, "", "")
+    monkeypatch.setattr(main.subprocess, "run", run)
+    body = c.post("/api/pcap/upload", files={"file": ("x.pcap", b"data")}).json()
+    assert body["alerts_stored"] == 12
+    assert not _has_state_table(tmp_path)
+
+def test_same_line_appended_or_reread_creates_no_duplicates(monkeypatch, tmp_path):
+    eve = setup(monkeypatch, tmp_path)
+    put(eve, alert(1))
+    poll(tmp_path)
+    put(eve, alert(1), append=True)  # exact same line appended again
+    poll(tmp_path)
+    assert total(tmp_path) == 1
+    with sqlite3.connect(tmp_path / "a.db") as db:  # offset lost: whole file is read again
+        db.execute("UPDATE live_capture_state SET offset = 0")
+    poll(tmp_path)
+    assert total(tmp_path) == 1
+
+def test_ipv4_outside_lab_net_only_counts_as_skipped(monkeypatch, tmp_path):
+    eve = setup(monkeypatch, tmp_path)
+    outside = str(ipaddress.ip_address("172.28.0.10") + 256)
+    put(eve, alert(1, src=outside) + alert(2, dest=outside) + alert(3, src="::1"))
+    poll(tmp_path)
+    assert total(tmp_path) == 0
+    assert live_capture.STATE["rows_stored"] == 0 and live_capture.STATE["rows_skipped_out_of_scope"] == 3
