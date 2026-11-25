@@ -11,12 +11,8 @@
   <style>
     /* 신호 흐름 애니메이션 (stroke-dashoffset) */
     @keyframes flowStroke {
-      from {
-        stroke-dashoffset: 24;
-      }
-      to {
-        stroke-dashoffset: 0;
-      }
+      from { stroke-dashoffset: 24; }
+      to { stroke-dashoffset: 0; }
     }
     .flow-line {
       stroke-dasharray: 6 3;
@@ -25,12 +21,8 @@
 
     /* C2 방향 미정 점멸 애니메이션 (주기 1.3초, 초당 3회 미만 안전 주기) */
     @keyframes c2Blink {
-      0%, 100% {
-        opacity: 0.95;
-      }
-      50% {
-        opacity: 0.25;
-      }
+      0%, 100% { opacity: 0.95; }
+      50% { opacity: 0.25; }
     }
     .c2-blink-line {
       stroke-dasharray: 4 4;
@@ -39,14 +31,8 @@
 
     /* OSI 7계층 공격 감지 계층 깜빡임 (주기 1.4초, 초당 3회 미만 안전 주기) */
     @keyframes layerSevPulse {
-      0%, 100% {
-        opacity: 1;
-        filter: brightness(1);
-      }
-      50% {
-        opacity: 0.55;
-        filter: brightness(1.25);
-      }
+      0%, 100% { opacity: 1; filter: brightness(1); }
+      50% { opacity: 0.55; filter: brightness(1.25); }
     }
     .layer-pulse {
       animation: layerSevPulse 1.4s ease-in-out infinite;
@@ -80,15 +66,26 @@
         <input type="file" id="pcapFileInput" accept=".pcap,.pcapng" class="hidden" />
       </label>
 
+      <!-- Discord 알림봇 설정 버튼 -->
+      <button type="button" id="btnAlertBotModal" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-semibold px-3 py-2 rounded-lg transition">
+        🔔 알림봇 설정
+      </button>
+
+      <!-- 웹 알림·대응 이력 보기 버튼 -->
+      <button type="button" id="btnNotifFeedModal" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-semibold px-3 py-2 rounded-lg transition flex items-center gap-1.5">
+        <span>📜 알림 이력</span>
+        <span id="notifFeedCount" class="px-1.5 py-0.5 rounded-full bg-sky-600 text-white text-[10px] font-bold">0</span>
+      </button>
+
       <!-- 침해사고 보고서(.md) 원클릭 다운로드 버튼 -->
-      <button id="btnExportReport" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold px-3 py-2 rounded-lg transition">
+      <button type="button" id="btnExportReport" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold px-3 py-2 rounded-lg transition">
         📄 보고서 내보내기 (.md)
       </button>
 
       <!-- Mock / Live API 모드 토글 -->
       <div class="flex items-center bg-slate-800 rounded-lg p-1 border border-slate-700 text-xs">
-        <button id="btnMockMode" class="px-3 py-1 rounded-md font-semibold bg-sky-600 text-white transition">Mock 모드</button>
-        <button id="btnLiveMode" class="px-3 py-1 rounded-md font-semibold text-slate-400 hover:text-white transition">Live API</button>
+        <button type="button" id="btnMockMode" class="px-3 py-1 rounded-md font-semibold bg-sky-600 text-white transition">Mock 모드</button>
+        <button type="button" id="btnLiveMode" class="px-3 py-1 rounded-md font-semibold text-slate-400 hover:text-white transition">Live API</button>
       </div>
     </div>
   </header>
@@ -167,7 +164,6 @@
                 <option value="TP">정탐 (TP)</option>
                 <option value="FP">오탐 (FP)</option>
               </select>
-              <!-- 6종 카테고리 필터 -->
               <select id="filterCategory" class="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-slate-200">
                 <option value="ALL">전체 카테고리</option>
                 <option value="sqli">SQLi (1000001)</option>
@@ -267,9 +263,27 @@
                   class="w-full bg-slate-800 border border-slate-700 rounded p-2 text-white focus:outline-none focus:border-sky-500"></textarea>
               </div>
 
-              <button id="btnSaveTriage" class="w-full bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold py-2 rounded-lg transition">
+              <button type="button" id="btnSaveTriage" class="w-full bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold py-2 rounded-lg transition">
                 트리아지 결과 저장
               </button>
+
+              <!-- 2-1. 승인 기반 임시 대응 & 알림봇 수동 발송 (Human-in-the-Loop) -->
+              <div class="bg-slate-950 border border-slate-800 rounded-lg p-3 space-y-2.5">
+                <div class="flex items-center justify-between">
+                  <h4 class="text-xs font-bold uppercase tracking-wider text-rose-400">승인 기반 임시 대응 (SOAR 시뮬레이션)</h4>
+                  <span id="containmentStatusBadge" class="text-[11px] text-slate-500">격리 안 됨</span>
+                </div>
+                <div class="grid grid-cols-2 gap-2 text-xs">
+                  <button type="button" id="btnToggleContainment"
+                    class="bg-rose-600 hover:bg-rose-500 text-white font-semibold py-2 px-3 rounded-lg transition">
+                    🛡️ 출발지 IP 임시 차단 (10분)
+                  </button>
+                  <button type="button" id="btnSendDiscordAlert"
+                    class="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-2 px-3 rounded-lg transition">
+                    🔔 알림 전송 (웹/디스코드)
+                  </button>
+                </div>
+              </div>
             </div>
 
             <!-- 3. 대응 플레이북 (공식 actions.linux / actions.ufw 구조 · 복사 전용) -->
@@ -279,9 +293,7 @@
                 <span class="text-[11px] text-slate-500">자동 실행 안 함 · 복사 후 수동 적용</span>
               </div>
               <div id="playbookEvidenceNote" class="hidden text-[11px] bg-amber-500/10 border border-amber-500/30 text-amber-200 rounded-lg p-2"></div>
-              <div id="playbookContainer" class="space-y-2 text-xs">
-                <!-- JS로 치환된 명령어와 복사 버튼 렌더링 -->
-              </div>
+              <div id="playbookContainer" class="space-y-2 text-xs"></div>
             </div>
 
             <!-- 3-1. 분석 명령 안내 영역 (안내 전용 / 실행 버튼 없음) -->
@@ -290,9 +302,7 @@
                 <h4 class="text-xs font-bold uppercase tracking-wider text-teal-400">분석 명령 안내</h4>
                 <span class="text-[11px] text-slate-500">조사 가이드 · 복사 후 터미널 수동 실행</span>
               </div>
-              <div id="analysisContainer" class="space-y-3 text-xs">
-                <!-- createElement 및 textContent로 동적 생성 -->
-              </div>
+              <div id="analysisContainer" class="space-y-3 text-xs"></div>
             </div>
           </div>
 
@@ -303,7 +313,6 @@
                 <h4 class="text-xs font-bold uppercase tracking-wider text-indigo-400">시각화 분석</h4>
                 <span class="text-[11px] text-slate-500">공격 흐름 · 토폴로지 구성도 · 계층 뷰</span>
               </div>
-              <!-- 보기 전환 세그먼트 버튼 3개 -->
               <div role="tablist" aria-label="시각화 보기 전환" class="flex items-center bg-slate-950 p-1 rounded-lg border border-slate-800 text-xs">
                 <button type="button" id="tabBtnFlow" role="tab" aria-selected="true" aria-controls="vizViewFlow" class="px-2.5 py-1 rounded-md font-semibold transition bg-indigo-600 text-white">공격 흐름</button>
                 <button type="button" id="tabBtnTopology" role="tab" aria-selected="false" aria-controls="vizViewTopology" class="px-2.5 py-1 rounded-md font-semibold transition text-slate-400 hover:text-slate-200">네트워크 구성도</button>
@@ -316,32 +325,24 @@
             </div>
 
             <div id="vizContent">
-              <!-- 1. 공격 흐름 보기 (기본값, 기존 타임라인+경로) -->
               <div id="vizViewFlow" role="tabpanel" aria-labelledby="tabBtnFlow" class="space-y-4">
-                <!-- 공격 경로 SVG 토폴로지 -->
                 <div class="bg-slate-950 border border-slate-800 rounded-lg p-3 space-y-2">
                   <div class="flex items-center justify-between">
                     <span class="text-xs font-semibold text-slate-300">공격 경로 토폴로지</span>
                     <span class="text-[11px] text-slate-500">Suricata(관찰자) · 실시간 집계</span>
                   </div>
-                  <div id="pathSvgContainer" class="w-full overflow-x-auto flex justify-center py-1">
-                    <!-- renderPath()에서 createElementNS로 안전하게 생성 -->
-                  </div>
+                  <div id="pathSvgContainer" class="w-full overflow-x-auto flex justify-center py-1"></div>
                 </div>
 
-                <!-- 공격 타임라인 스토리 -->
                 <div class="bg-slate-950 border border-slate-800 rounded-lg p-3 space-y-2">
                   <div class="flex items-center justify-between">
                     <span class="text-xs font-semibold text-slate-300">공격 진행 타임라인</span>
                     <span class="text-[11px] text-slate-500">MITRE ATT&amp;CK 전술 단계</span>
                   </div>
-                  <div id="storyContainer" class="space-y-2 text-xs max-h-72 overflow-y-auto pr-1">
-                    <!-- renderStory()에서 안전하게 생성 -->
-                  </div>
+                  <div id="storyContainer" class="space-y-2 text-xs max-h-72 overflow-y-auto pr-1"></div>
                 </div>
               </div>
 
-              <!-- 2. 네트워크 구성도 (토폴로지) 보기 -->
               <div id="vizViewTopology" role="tabpanel" aria-labelledby="tabBtnTopology" class="hidden space-y-2">
                 <div class="bg-slate-950 border border-slate-800 rounded-lg p-3 space-y-2">
                   <div class="flex items-center justify-between">
@@ -351,22 +352,17 @@
                     </div>
                     <span class="text-[11px] text-slate-500">신호 흐름 · C2 방향 미정 점멸</span>
                   </div>
-                  <div id="topologySvgContainer" class="w-full overflow-x-auto flex justify-center py-1">
-                    <!-- renderTopology()에서 createElementNS로 안전하게 생성 -->
-                  </div>
+                  <div id="topologySvgContainer" class="w-full overflow-x-auto flex justify-center py-1"></div>
                 </div>
               </div>
 
-              <!-- 3. OSI 7계층 (계층 보기) -->
               <div id="vizViewOsi" role="tabpanel" aria-labelledby="tabBtnOsi" class="hidden space-y-2">
                 <div class="bg-slate-950 border border-slate-800 rounded-lg p-3 space-y-3">
                   <div class="flex items-center justify-between">
                     <span class="text-xs font-semibold text-slate-300">OSI 7계층 공격 분포</span>
                     <span class="text-[11px] text-slate-500">초당 3회 미만 안전 깜빡임 (1.2~1.5s)</span>
                   </div>
-                  <div id="osiLayersContainer" class="space-y-2 text-xs">
-                    <!-- renderOsiLayers()에서 DOM 요소로 안전하게 생성 -->
-                  </div>
+                  <div id="osiLayersContainer" class="space-y-2 text-xs"></div>
                 </div>
               </div>
             </div>
@@ -395,7 +391,6 @@
 
       <!-- [1순위] 시간대별 타임라인 + [2순위] 룰별 정탐/오탐 비율 -->
       <section class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        <!-- 1순위: 시간대별 경보 타임라인 -->
         <div class="lg:col-span-6 bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-3">
           <div class="flex flex-wrap items-center justify-between gap-2">
             <div>
@@ -412,7 +407,6 @@
           </div>
         </div>
 
-        <!-- 2순위: 룰별(SID) 정탐 / 오탐 판정 비율 -->
         <div class="lg:col-span-6 bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-3">
           <div>
             <h2 class="text-sm font-bold text-slate-100">룰별(SID) 정탐 / 오탐 판정 비율</h2>
@@ -433,13 +427,65 @@
           </div>
           <span id="mitreCoverageSummary" class="text-xs font-mono font-semibold text-sky-400"></span>
         </div>
-        <div id="mitreCoverageGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          <!-- renderMitreCoverage()에서 안전하게 렌더링 -->
-        </div>
+        <div id="mitreCoverageGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3"></div>
       </section>
 
     </div> <!-- // viewAnalytics 끝 -->
   </main>
+
+  <!-- Discord 알림봇 설정 모달 -->
+  <div id="alertBotModal" class="hidden fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-xl max-w-md w-full p-5 space-y-4 shadow-2xl">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 class="text-sm font-bold text-sky-400">🔔 Discord 알림봇 연동 설정</h3>
+        <button type="button" id="btnCloseBotModal" class="text-slate-400 hover:text-white text-sm">✕</button>
+      </div>
+
+      <div class="space-y-3 text-xs">
+        <div>
+          <label class="block text-slate-400 mb-1">Discord Webhook URL (선택 · 세션 임시 저장)</label>
+          <input type="password" id="discordWebhookInput" placeholder="https://discord.com/api/webhooks/..."
+            class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-sky-500" />
+          <p class="text-[11px] text-slate-500 mt-1">* URL을 비워두어도 웹 화면 토스트와 알림 이력에 동일하게 출력됩니다.</p>
+        </div>
+
+        <label class="flex items-center gap-2 cursor-pointer text-slate-300">
+          <input type="checkbox" id="autoNotifySev1" class="rounded bg-slate-800 border-slate-600" />
+          <span>고위험(SEV1) 신규 경보 탐지 시 자동 알림 발송</span>
+        </label>
+      </div>
+
+      <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-800 text-xs">
+        <button type="button" id="btnTestDiscord" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 transition">테스트 발송</button>
+        <button type="button" id="btnSaveBotConfig" class="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-semibold transition">저장</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 우측 하단 실시간 웹 토스트 알림 컨테이너 -->
+  <div id="webToastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2.5 w-80 max-w-[90vw] pointer-events-none"></div>
+
+  <!-- 웹 알림 & SOAR 대응 이력 모달 -->
+  <div id="notifFeedModal" class="hidden fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-xl max-w-lg w-full p-5 space-y-4 shadow-2xl">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div>
+          <h3 class="text-sm font-bold text-sky-400">📜 실시간 알림 및 임시 대응 이력 (Audit Feed)</h3>
+          <p class="text-[11px] text-slate-400">Discord 연동 여부와 무관하게 웹 대시보드에 모든 알림이 기록됩니다.</p>
+        </div>
+        <button type="button" id="btnCloseNotifFeed" class="text-slate-400 hover:text-white text-sm">✕</button>
+      </div>
+
+      <div id="notifFeedList" class="space-y-2.5 max-h-96 overflow-y-auto pr-1 text-xs">
+        <div class="text-center py-8 text-slate-500">아직 기록된 알림 이력이 없습니다.</div>
+      </div>
+
+      <div class="flex items-center justify-between pt-2 border-t border-slate-800 text-xs">
+        <button type="button" id="btnClearNotifFeed" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition">이력 비우기</button>
+        <button type="button" id="btnCloseNotifFeedBottom" class="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-semibold transition">닫기</button>
+      </div>
+    </div>
+  </div>
 
   <script>
     // ==========================================
@@ -453,7 +499,6 @@
     let categoryChartInstance = null;
     let currentVizTab = "flow"; // "flow" | "topology" | "osi"
 
-    // 6종 카테고리 기본 정의 (순서·라벨·색상)
     const BASE_CATEGORIES = [
       { key: "sqli", label: "SQLi", color: "#f43f5e" },
       { key: "xss", label: "XSS", color: "#f59e0b" },
@@ -463,7 +508,6 @@
       { key: "ssrf", label: "SSRF", color: "#ec4899" }
     ];
 
-    // 공식 플레이북 구조 생성 헬퍼 (Mock용)
     function makeMockPlaybook(name, blockLinux, verifyLinux, rollbackLinux, blockUfw, verifyUfw, rollbackUfw, analysis) {
       return {
         name,
@@ -476,7 +520,6 @@
       };
     }
 
-    // 실습망(attacker 172.28.0.100, victim-web .10, victim-pc .11) 및 6종 규격 Mock 데이터
     const MOCK_ALERTS = [
       {
         id: 1,
@@ -761,7 +804,6 @@
         .replaceAll("{{DEST_PORT}}", sanitizeCliToken(alert.dest_port, "port"));
     }
 
-    // 분석 명령 템플릿의 {{SRC_IP}}, {{DEST_PORT}}만 안전 치환 (프론트 전용)
     function replaceAnalysisVars(template, alert) {
       if (!template) return "";
       return String(template)
@@ -819,9 +861,7 @@
           try {
             await navigator.clipboard.writeText(substitutedCmd);
             copyBtn.textContent = "복사됨!";
-            setTimeout(() => {
-              copyBtn.textContent = "복사";
-            }, 1200);
+            setTimeout(() => { copyBtn.textContent = "복사"; }, 1200);
           } catch (_) {
             setStatus("클립보드 복사 권한이 차단되어 있습니다.", true);
           }
@@ -881,7 +921,6 @@
       });
     }
 
-    // 공식 플레이북 구조(actions.linux / actions.ufw)에서 명령어 추출
     function extractPlaybookGroups(alert) {
       const pb = alert.playbook || {};
       const groups = [];
@@ -912,7 +951,6 @@
         "마지막 갱신: " + new Date().toLocaleTimeString("ko-KR");
     }
 
-    // 모드 전환 또는 빈 목록일 때 이전 상세·트리아지 입력 초기화
     function clearDetailPanel() {
       selectedAlertId = null;
       document.getElementById("detailPanel").classList.add("hidden");
@@ -954,9 +992,7 @@
         try {
           const statsRes = await fetch(`${API_BASE}/api/stats`);
           if (statsRes.ok) stats = await statsRes.json();
-        } catch (_) {
-          // stats 실패 시 프론트 집계로 폴백
-        }
+        } catch (_) {}
 
         if (
           alertsData.length === 0 ||
@@ -1050,9 +1086,9 @@
       if (currentMainView === "analytics") {
         renderAnalyticsDashboard();
       }
+      checkAndAutoNotifySev1(alertsData);
     }
 
-    // 상단 KPI 및 6종(+미지 카테고리 포함) 차트 갱신
     function renderKPIAndChart(serverStats) {
       const total = serverStats?.total ?? alertsData.length;
       const sevCounts = serverStats?.severity_counts;
@@ -1169,6 +1205,9 @@
         const riskBadge = alert.is_confirmed_risk
           ? `<span class="ml-1 px-1.5 py-0.5 text-[10px] bg-rose-600 text-white rounded">확정위험</span>`
           : "";
+        const containedBadge = isIpContained(alert.src_ip)
+          ? `<span class="ml-1 px-1.5 py-0.5 text-[10px] bg-amber-600 text-white rounded">🔒 격리됨</span>`
+          : "";
         const verdict = alert.verdict || "UNREVIEWED";
         const verdictColor = verdict === "TP" ? "text-rose-400" : verdict === "FP" ? "text-emerald-400" : "text-slate-400";
         const categoryText = String(alert.category || "unknown").toUpperCase();
@@ -1183,7 +1222,7 @@
               <div class="text-slate-400 truncate max-w-[260px]">${escapeHtml(alert.signature || "-")}</div>
             </td>
             <td class="px-3 py-3 font-mono text-slate-300 whitespace-nowrap">
-              ${escapeHtml(alert.src_ip || "-")} → ${escapeHtml(alert.dest_ip || "-")}:${escapeHtml(alert.dest_port ?? "-")}
+              ${escapeHtml(alert.src_ip || "-")}${containedBadge} → ${escapeHtml(alert.dest_ip || "-")}:${escapeHtml(alert.dest_port ?? "-")}
             </td>
             <td class="px-3 py-3 font-bold ${verdictColor}">${escapeHtml(verdict)}</td>
           </tr>
@@ -1203,7 +1242,6 @@
       });
     }
 
-    // 우측 상세 정보, 트리아지 폼, 공식 플레이북 렌더링
     function renderDetailPanel(alert) {
       document.getElementById("emptyDetail").classList.add("hidden");
       document.getElementById("detailPanel").classList.remove("hidden");
@@ -1230,6 +1268,8 @@
       document.getElementById("triageConfidence").value = alert.confidence || "MEDIUM";
       document.getElementById("triageObservation").value = alert.observation || "";
       document.getElementById("triageAssessment").value = alert.assessment || "";
+
+      updateContainmentUI(alert);
 
       const pb = alert.playbook || {};
       document.getElementById("playbookTitle").textContent = pb.name ? `대응 플레이북: ${pb.name}` : "대응 플레이북 (CLI 안내용)";
@@ -1312,12 +1352,7 @@
     }
 
     function getSeverityHexColor(sev) {
-      const map = {
-        SEV1: "#f43f5e",
-        SEV2: "#f59e0b",
-        SEV3: "#38bdf8",
-        SEV4: "#94a3b8"
-      };
+      const map = { SEV1: "#f43f5e", SEV2: "#f59e0b", SEV3: "#38bdf8", SEV4: "#94a3b8" };
       return map[sev] || "#94a3b8";
     }
 
@@ -1337,21 +1372,14 @@
       if (vizContentEl) vizContentEl.classList.remove("hidden");
       if (!storyContainer) return;
 
-      const sorted = [...items].sort((a, b) => {
-        const timeA = new Date(a.timestamp || 0).getTime();
-        const timeB = new Date(b.timestamp || 0).getTime();
-        return timeA - timeB;
-      });
-
+      const sorted = [...items].sort((a, b) => new Date(a.timestamp || 0) - new Date(b.timestamp || 0));
       const uniqueSrcs = new Set(sorted.map(a => a.src_ip || "unknown"));
       const isMultiSrc = uniqueSrcs.size >= 2;
-
       storyContainer.textContent = "";
 
       const createItemEl = (alert) => {
         const itemDiv = document.createElement("div");
         itemDiv.className = "flex items-start gap-2.5 p-2 rounded bg-slate-900 border border-slate-800 hover:border-slate-700 transition cursor-pointer";
-
         itemDiv.addEventListener("click", () => {
           selectedAlertId = alert.id;
           renderAlertTable();
@@ -1379,7 +1407,6 @@
         timeSpan.className = "text-[10px] font-mono text-slate-500 whitespace-nowrap";
         timeSpan.textContent = String(alert.timestamp || "").slice(11, 19) || "-";
         topRow.appendChild(timeSpan);
-
         body.appendChild(topRow);
 
         const sigDiv = document.createElement("div");
@@ -1407,9 +1434,7 @@
       };
 
       if (!isMultiSrc) {
-        sorted.forEach(alert => {
-          storyContainer.appendChild(createItemEl(alert));
-        });
+        sorted.forEach(alert => storyContainer.appendChild(createItemEl(alert)));
       } else {
         const groups = {};
         sorted.forEach(alert => {
@@ -1417,25 +1442,17 @@
           if (!groups[src]) groups[src] = [];
           groups[src].push(alert);
         });
-
         Object.keys(groups).forEach(src => {
           const groupHeader = document.createElement("div");
           groupHeader.className = "pt-2 pb-1 text-[11px] font-bold text-amber-400 border-b border-slate-800 flex items-center justify-between";
-
           const headerTitle = document.createElement("span");
           headerTitle.textContent = `출발지 IP: ${src}`;
-          groupHeader.appendChild(headerTitle);
-
           const countSpan = document.createElement("span");
           countSpan.className = "text-slate-500 font-normal";
           countSpan.textContent = `${groups[src].length}건`;
-          groupHeader.appendChild(countSpan);
-
+          groupHeader.append(headerTitle, countSpan);
           storyContainer.appendChild(groupHeader);
-
-          groups[src].forEach(alert => {
-            storyContainer.appendChild(createItemEl(alert));
-          });
+          groups[src].forEach(alert => storyContainer.appendChild(createItemEl(alert)));
         });
       }
     }
@@ -1444,35 +1461,25 @@
       const container = document.getElementById("pathSvgContainer");
       if (!container) return;
       container.textContent = "";
-
-      if (!items || items.length === 0) {
-        return;
-      }
+      if (!items || items.length === 0) return;
 
       const linksMap = new Map();
       items.forEach(a => {
         const src = a.src_ip || "unknown";
         const dst = `${a.dest_ip || "unknown"}:${a.dest_port ?? "unknown"}`;
         const key = `${src} -> ${dst}`;
-        if (!linksMap.has(key)) {
-          linksMap.set(key, { src, dst, c2Alerts: [], otherAlerts: [] });
-        }
+        if (!linksMap.has(key)) linksMap.set(key, { src, dst, c2Alerts: [], otherAlerts: [] });
         const bucket = linksMap.get(key);
-        const cat = String(a.category || "").toLowerCase();
-        if (cat === "c2_beacon") bucket.c2Alerts.push(a);
+        if (String(a.category || "").toLowerCase() === "c2_beacon") bucket.c2Alerts.push(a);
         else bucket.otherAlerts.push(a);
       });
 
       const getPathHighestSev = (alertList) => {
         const sevOrder = { SEV1: 1, SEV2: 2, SEV3: 3, SEV4: 4 };
-        let highest = "SEV4";
-        let minRank = 4;
+        let highest = "SEV4", minRank = 4;
         alertList.forEach(a => {
           const rank = sevOrder[a.severity] || 4;
-          if (rank < minRank) {
-            minRank = rank;
-            highest = a.severity;
-          }
+          if (rank < minRank) { minRank = rank; highest = a.severity; }
         });
         return highest;
       };
@@ -1480,10 +1487,8 @@
       const links = Array.from(linksMap.values());
       const uniqueSrcs = Array.from(new Set(links.map(l => l.src)));
       const uniqueDsts = Array.from(new Set(links.map(l => l.dst)));
-
       const maxNodes = Math.max(uniqueSrcs.length, uniqueDsts.length, 1);
-      const rowHeight = 65;
-      const svgHeight = Math.max(160, maxNodes * rowHeight + 40);
+      const svgHeight = Math.max(160, maxNodes * 65 + 40);
       const svgWidth = 460;
 
       const svgNS = "http://www.w3.org/2000/svg";
@@ -1493,8 +1498,7 @@
       svg.setAttribute("class", "overflow-visible select-none text-xs");
 
       const defs = document.createElementNS(svgNS, "defs");
-      const severities = ["SEV1", "SEV2", "SEV3", "SEV4"];
-      severities.forEach(sev => {
+      ["SEV1", "SEV2", "SEV3", "SEV4"].forEach(sev => {
         const marker = document.createElementNS(svgNS, "marker");
         marker.setAttribute("id", `arrow-${sev}`);
         marker.setAttribute("viewBox", "0 0 10 10");
@@ -1511,38 +1515,18 @@
       });
       svg.appendChild(defs);
 
-      const srcCoords = new Map();
-      const dstCoords = new Map();
-
-      const getSrcY = (idx, total) => {
-        const spacing = (svgHeight - 40) / (total + 1);
-        return 20 + spacing * (idx + 1);
-      };
-
-      const getDstY = (idx, total) => {
-        const spacing = (svgHeight - 40) / (total + 1);
-        return 20 + spacing * (idx + 1);
-      };
-
-      uniqueSrcs.forEach((src, idx) => {
-        srcCoords.set(src, { x: 75, y: getSrcY(idx, uniqueSrcs.length) });
-      });
-
-      uniqueDsts.forEach((dst, idx) => {
-        dstCoords.set(dst, { x: 385, y: getDstY(idx, uniqueDsts.length) });
-      });
+      const srcCoords = new Map(), dstCoords = new Map();
+      uniqueSrcs.forEach((src, idx) => srcCoords.set(src, { x: 75, y: 20 + ((svgHeight - 40) / (uniqueSrcs.length + 1)) * (idx + 1) }));
+      uniqueDsts.forEach((dst, idx) => dstCoords.set(dst, { x: 385, y: 20 + ((svgHeight - 40) / (uniqueDsts.length + 1)) * (idx + 1) }));
 
       const drawPathLink = (src, dst, alerts, isC2, yOffset) => {
         if (!alerts.length) return;
-        const start = srcCoords.get(src);
-        const end = dstCoords.get(dst);
+        const start = srcCoords.get(src), end = dstCoords.get(dst);
         if (!start || !end) return;
 
         const isCurrentSelected = selected && alerts.some(a => String(a.id) === String(selected.id));
         const highestSev = getPathHighestSev(alerts);
         const strokeColor = getSeverityHexColor(highestSev);
-        const strokeWidth = isCurrentSelected ? 4 : 2;
-
         const g = document.createElementNS(svgNS, "g");
 
         const line = document.createElementNS(svgNS, "line");
@@ -1551,19 +1535,13 @@
         line.setAttribute("x2", String(end.x));
         line.setAttribute("y2", String(end.y + yOffset));
         line.setAttribute("stroke", strokeColor);
-        line.setAttribute("stroke-width", String(strokeWidth));
-
-        if (!isC2) {
-          line.setAttribute("marker-end", `url(#arrow-${highestSev})`);
-        } else {
-          line.setAttribute("stroke-dasharray", "4 3");
-        }
-
+        line.setAttribute("stroke-width", String(isCurrentSelected ? 4 : 2));
+        if (!isC2) line.setAttribute("marker-end", `url(#arrow-${highestSev})`);
+        else line.setAttribute("stroke-dasharray", "4 3");
         line.setAttribute("stroke-opacity", isCurrentSelected ? "1" : "0.75");
         g.appendChild(line);
 
-        const midX = (start.x + end.x) / 2;
-        const midY = (start.y + end.y) / 2 + yOffset;
+        const midX = (start.x + end.x) / 2, midY = (start.y + end.y) / 2 + yOffset;
         const labelText = isC2 ? `${alerts.length}건 (방향 미정)` : `${alerts.length}건`;
         const textWidth = isC2 ? 84 : 32;
 
@@ -1587,7 +1565,6 @@
         countSvgText.setAttribute("font-weight", "bold");
         countSvgText.textContent = labelText;
         g.appendChild(countSvgText);
-
         svg.appendChild(g);
       };
 
@@ -1597,11 +1574,8 @@
         drawPathLink(bucket.src, bucket.dst, bucket.otherAlerts, false, hasBoth ? 8 : 0);
       });
 
-      const suricataX = svgWidth / 2;
-      const suricataY = svgHeight - 24;
-
+      const suricataX = svgWidth / 2, suricataY = svgHeight - 24;
       const suriGroup = document.createElementNS(svgNS, "g");
-
       const suriLine = document.createElementNS(svgNS, "line");
       suriLine.setAttribute("x1", String(suricataX));
       suriLine.setAttribute("y1", String(svgHeight / 2));
@@ -1632,15 +1606,12 @@
       suriText.setAttribute("font-weight", "bold");
       suriText.textContent = "👁️ Suricata (관찰자)";
       suriGroup.appendChild(suriText);
-
       svg.appendChild(suriGroup);
 
       uniqueSrcs.forEach(src => {
         const coord = srcCoords.get(src);
         const isHighlight = selected && selected.src_ip === src;
-
         const g = document.createElementNS(svgNS, "g");
-
         const circle = document.createElementNS(svgNS, "circle");
         circle.setAttribute("cx", String(coord.x));
         circle.setAttribute("cy", String(coord.y));
@@ -1668,16 +1639,13 @@
         label.setAttribute("font-weight", isHighlight ? "bold" : "normal");
         label.textContent = src;
         g.appendChild(label);
-
         svg.appendChild(g);
       });
 
       uniqueDsts.forEach(dst => {
         const coord = dstCoords.get(dst);
         const isHighlight = selected && `${selected.dest_ip || "unknown"}:${selected.dest_port ?? "unknown"}` === dst;
-
         const g = document.createElementNS(svgNS, "g");
-
         const circle = document.createElementNS(svgNS, "circle");
         circle.setAttribute("cx", String(coord.x));
         circle.setAttribute("cy", String(coord.y));
@@ -1705,7 +1673,6 @@
         label.setAttribute("font-weight", isHighlight ? "bold" : "normal");
         label.textContent = dst;
         g.appendChild(label);
-
         svg.appendChild(g);
       });
 
@@ -1726,21 +1693,17 @@
       const container = document.getElementById("topologySvgContainer");
       if (!container) return;
       container.textContent = "";
-
       if (!items || items.length === 0) return;
 
       const svgNS = "http://www.w3.org/2000/svg";
-      const svgWidth = 500;
-      const svgHeight = 360;
-
+      const svgWidth = 500, svgHeight = 360;
       const svg = document.createElementNS(svgNS, "svg");
       svg.setAttribute("width", "100%");
       svg.setAttribute("viewBox", `0 0 ${svgWidth} ${svgHeight}`);
       svg.setAttribute("class", "overflow-visible select-none text-xs");
 
       const defs = document.createElementNS(svgNS, "defs");
-      const severities = ["SEV1", "SEV2", "SEV3", "SEV4"];
-      severities.forEach(sev => {
+      ["SEV1", "SEV2", "SEV3", "SEV4"].forEach(sev => {
         const marker = document.createElementNS(svgNS, "marker");
         marker.setAttribute("id", `topo-arrow-${sev}`);
         marker.setAttribute("viewBox", "0 0 10 10");
@@ -1758,29 +1721,14 @@
       svg.appendChild(defs);
 
       const hostIps = [];
-      const addHost = (ip) => {
-        if (!ip || ip === "unknown") return;
-        if (!hostIps.includes(ip)) hostIps.push(ip);
-      };
+      const addHost = (ip) => { if (ip && ip !== "unknown" && !hostIps.includes(ip)) hostIps.push(ip); };
+      items.forEach(a => { addHost(a.src_ip); addHost(a.dest_ip); });
 
-      items.forEach(a => {
-        addHost(a.src_ip);
-        addHost(a.dest_ip);
-      });
-
-      const bridgeX = 250;
-      const bridgeY = 175;
-
+      const bridgeX = 250, bridgeY = 175;
       const hostCoords = new Map();
-      const n = hostIps.length;
-      const radiusX = 175;
-      const radiusY = 110;
-
       hostIps.forEach((ip, idx) => {
-        const angle = -Math.PI / 2 + (2 * Math.PI * idx) / Math.max(n, 1);
-        const x = Math.round(bridgeX + radiusX * Math.cos(angle));
-        const y = Math.round(bridgeY + radiusY * Math.sin(angle));
-        hostCoords.set(ip, { x, y });
+        const angle = -Math.PI / 2 + (2 * Math.PI * idx) / Math.max(hostIps.length, 1);
+        hostCoords.set(ip, { x: Math.round(bridgeX + 175 * Math.cos(angle)), y: Math.round(bridgeY + 110 * Math.sin(angle)) });
       });
 
       hostIps.forEach(ip => {
@@ -1797,9 +1745,7 @@
         svg.appendChild(line);
       });
 
-      const suriX = bridgeX;
-      const suriY = bridgeY + 80;
-
+      const suriX = bridgeX, suriY = bridgeY + 80;
       const suriLine = document.createElementNS(svgNS, "line");
       suriLine.setAttribute("x1", String(bridgeX));
       suriLine.setAttribute("y1", String(bridgeY + 24));
@@ -1834,72 +1780,48 @@
       svg.appendChild(suriGroup);
 
       const pairAttackMap = new Map();
-
       items.forEach(a => {
-        const src = a.src_ip;
-        const dst = a.dest_ip;
-        if (!src || !dst) return;
-        const key = `${src}->${dst}`;
-        if (!pairAttackMap.has(key)) {
-          pairAttackMap.set(key, { src, dst, c2Alerts: [], otherAlerts: [] });
-        }
+        if (!a.src_ip || !a.dest_ip) return;
+        const key = `${a.src_ip}->${a.dest_ip}`;
+        if (!pairAttackMap.has(key)) pairAttackMap.set(key, { src: a.src_ip, dst: a.dest_ip, c2Alerts: [], otherAlerts: [] });
         const bucket = pairAttackMap.get(key);
-        const cat = String(a.category || "").toLowerCase();
-        if (cat === "c2_beacon") {
-          bucket.c2Alerts.push(a);
-        } else {
-          bucket.otherAlerts.push(a);
-        }
+        if (String(a.category || "").toLowerCase() === "c2_beacon") bucket.c2Alerts.push(a);
+        else bucket.otherAlerts.push(a);
       });
 
       const getHighestSev = (alertList) => {
         const sevOrder = { SEV1: 1, SEV2: 2, SEV3: 3, SEV4: 4 };
-        let highest = "SEV4";
-        let minRank = 4;
+        let highest = "SEV4", minRank = 4;
         alertList.forEach(a => {
           const rank = sevOrder[a.severity] || 4;
-          if (rank < minRank) {
-            minRank = rank;
-            highest = a.severity;
-          }
+          if (rank < minRank) { minRank = rank; highest = a.severity; }
         });
         return highest;
       };
 
       const renderCurveLine = (start, end, offset, isC2, highestSev, count, isSelectedAlertOnLine) => {
         const g = document.createElementNS(svgNS, "g");
-
-        const midX = (start.x + end.x) / 2;
-        const midY = (start.y + end.y) / 2;
-        const dx = end.x - start.x;
-        const dy = end.y - start.y;
+        const midX = (start.x + end.x) / 2, midY = (start.y + end.y) / 2;
+        const dx = end.x - start.x, dy = end.y - start.y;
         const len = Math.sqrt(dx * dx + dy * dy) || 1;
-        const nx = -dy / len;
-        const ny = dx / len;
+        const ctrlX = Math.round(midX + (-dy / len) * offset);
+        const ctrlY = Math.round(midY + (dx / len) * offset);
 
-        const ctrlX = Math.round(midX + nx * offset);
-        const ctrlY = Math.round(midY + ny * offset);
-
-        const pathData = `M ${start.x} ${start.y} Q ${ctrlX} ${ctrlY} ${end.x} ${end.y}`;
         const pathEl = document.createElementNS(svgNS, "path");
-        pathEl.setAttribute("d", pathData);
+        pathEl.setAttribute("d", `M ${start.x} ${start.y} Q ${ctrlX} ${ctrlY} ${end.x} ${end.y}`);
         pathEl.setAttribute("fill", "none");
         const strokeColor = getSeverityHexColor(highestSev);
         pathEl.setAttribute("stroke", strokeColor);
         pathEl.setAttribute("stroke-width", isSelectedAlertOnLine ? "3.5" : "2");
-
-        if (isC2) {
-          pathEl.setAttribute("class", "c2-blink-line");
-        } else {
+        if (isC2) pathEl.setAttribute("class", "c2-blink-line");
+        else {
           pathEl.setAttribute("class", "flow-line");
           pathEl.setAttribute("marker-end", `url(#topo-arrow-${highestSev})`);
         }
-
         g.appendChild(pathEl);
 
         const labelX = Math.round(0.25 * start.x + 0.5 * ctrlX + 0.25 * end.x);
         const labelY = Math.round(0.25 * start.y + 0.5 * ctrlY + 0.25 * end.y);
-
         const labelText = isC2 ? `${count}건 (방향 미정)` : `${count}건`;
         const textWidth = isC2 ? 88 : 34;
 
@@ -1923,29 +1845,20 @@
         textEl.setAttribute("font-weight", "bold");
         textEl.textContent = labelText;
         g.appendChild(textEl);
-
         svg.appendChild(g);
       };
 
       pairAttackMap.forEach(bucket => {
-        const start = hostCoords.get(bucket.src);
-        const end = hostCoords.get(bucket.dst);
+        const start = hostCoords.get(bucket.src), end = hostCoords.get(bucket.dst);
         if (!start || !end) return;
-
         const hasBoth = bucket.c2Alerts.length > 0 && bucket.otherAlerts.length > 0;
-
         if (bucket.c2Alerts.length > 0) {
-          const c2Sev = getHighestSev(bucket.c2Alerts);
           const isSelected = selected && bucket.c2Alerts.some(a => String(a.id) === String(selected.id));
-          const offset = hasBoth ? -25 : -10;
-          renderCurveLine(start, end, offset, true, c2Sev, bucket.c2Alerts.length, isSelected);
+          renderCurveLine(start, end, hasBoth ? -25 : -10, true, getHighestSev(bucket.c2Alerts), bucket.c2Alerts.length, isSelected);
         }
-
         if (bucket.otherAlerts.length > 0) {
-          const otherSev = getHighestSev(bucket.otherAlerts);
           const isSelected = selected && bucket.otherAlerts.some(a => String(a.id) === String(selected.id));
-          const offset = hasBoth ? 25 : 10;
-          renderCurveLine(start, end, offset, false, otherSev, bucket.otherAlerts.length, isSelected);
+          renderCurveLine(start, end, hasBoth ? 25 : 10, false, getHighestSev(bucket.otherAlerts), bucket.otherAlerts.length, isSelected);
         }
       });
 
@@ -1980,16 +1893,13 @@
       bridgeSub.setAttribute("font-family", "monospace");
       bridgeSub.textContent = "172.28.0.0/24";
       bridgeGroup.appendChild(bridgeSub);
-
       svg.appendChild(bridgeGroup);
 
       hostIps.forEach(ip => {
         const coord = hostCoords.get(ip);
         if (!coord) return;
-
         const isHighlight = selected && (selected.src_ip === ip || selected.dest_ip === ip);
         const hostName = getKnownHostName(ip);
-
         const g = document.createElementNS(svgNS, "g");
 
         const circle = document.createElementNS(svgNS, "circle");
@@ -2041,7 +1951,6 @@
           ipText.textContent = ip;
           g.appendChild(ipText);
         }
-
         svg.appendChild(g);
       });
 
@@ -2055,7 +1964,6 @@
       const container = document.getElementById("osiLayersContainer");
       if (!container) return;
       container.textContent = "";
-
       if (!items || items.length === 0) return;
 
       const layers = [
@@ -2073,46 +1981,27 @@
       items.forEach(alert => {
         const cat = String(alert.category || "").toLowerCase();
         let matched = false;
-
         if (cat === "sqli" || cat === "xss" || cat === "ssrf") {
-          layers[0].alerts.push(alert);
-          layers[0].cats.add(cat.toUpperCase());
-          matched = true;
+          layers[0].alerts.push(alert); layers[0].cats.add(cat.toUpperCase()); matched = true;
         } else if (cat === "portscan" || cat === "c2_beacon") {
-          layers[3].alerts.push(alert);
-          layers[3].cats.add(cat.toUpperCase());
-          layers[4].alerts.push(alert);
-          layers[4].cats.add(cat.toUpperCase());
-          matched = true;
+          layers[3].alerts.push(alert); layers[3].cats.add(cat.toUpperCase());
+          layers[4].alerts.push(alert); layers[4].cats.add(cat.toUpperCase()); matched = true;
         } else if (cat === "bruteforce") {
-          layers[0].alerts.push(alert);
-          layers[0].cats.add("BRUTEFORCE(SSH)");
-          layers[3].alerts.push(alert);
-          layers[3].cats.add("BRUTEFORCE(L4탐지)");
-          matched = true;
+          layers[0].alerts.push(alert); layers[0].cats.add("BRUTEFORCE(SSH)");
+          layers[3].alerts.push(alert); layers[3].cats.add("BRUTEFORCE(L4탐지)"); matched = true;
         }
-
         if (!matched) {
-          unclassified.alerts.push(alert);
-          unclassified.cats.add(cat ? cat.toUpperCase() : "UNKNOWN");
+          unclassified.alerts.push(alert); unclassified.cats.add(cat ? cat.toUpperCase() : "UNKNOWN");
         }
       });
 
-      const allBuckets = [...layers];
-      if (unclassified.alerts.length > 0) {
-        allBuckets.push(unclassified);
-      }
-
+      const allBuckets = unclassified.alerts.length > 0 ? [...layers, unclassified] : [...layers];
       const getHighestSev = (alertList) => {
         const sevOrder = { SEV1: 1, SEV2: 2, SEV3: 3, SEV4: 4 };
-        let highest = "SEV4";
-        let minRank = 4;
+        let highest = "SEV4", minRank = 4;
         alertList.forEach(a => {
           const rank = sevOrder[a.severity] || 4;
-          if (rank < minRank) {
-            minRank = rank;
-            highest = a.severity;
-          }
+          if (rank < minRank) { minRank = rank; highest = a.severity; }
         });
         return highest;
       };
@@ -2124,24 +2013,14 @@
 
         const card = document.createElement("div");
         let baseClass = "p-3 rounded-lg border transition space-y-2 ";
-
-        if (isSelectedLayer) {
-          baseClass += "border-sky-400 bg-slate-900/90 ring-1 ring-sky-400/50 shadow-md shadow-sky-950 ";
-        } else if (hasAttack) {
-          baseClass += "border-slate-700 bg-slate-900/60 ";
-        } else {
-          baseClass += "border-slate-800/60 bg-slate-950/40 opacity-70 ";
-        }
-
-        if (hasAttack) {
-          baseClass += "layer-pulse ";
-        }
-
+        if (isSelectedLayer) baseClass += "border-sky-400 bg-slate-900/90 ring-1 ring-sky-400/50 shadow-md shadow-sky-950 ";
+        else if (hasAttack) baseClass += "border-slate-700 bg-slate-900/60 ";
+        else baseClass += "border-slate-800/60 bg-slate-950/40 opacity-70 ";
+        if (hasAttack) baseClass += "layer-pulse ";
         card.className = baseClass;
 
         const header = document.createElement("div");
         header.className = "flex flex-wrap items-center justify-between gap-1";
-
         const titleDiv = document.createElement("div");
         titleDiv.className = "flex items-center gap-2";
 
@@ -2161,7 +2040,6 @@
         nameSpan.className = isSelectedLayer ? "font-bold text-white" : "font-semibold text-slate-200";
         nameSpan.textContent = layer.name;
         titleDiv.appendChild(nameSpan);
-
         header.appendChild(titleDiv);
 
         const countBadge = document.createElement("span");
@@ -2184,27 +2062,20 @@
         if (hasAttack) {
           const chipsDiv = document.createElement("div");
           chipsDiv.className = "flex flex-wrap gap-1.5 pt-1 border-t border-slate-800/80";
-
           layer.cats.forEach(catName => {
             const chip = document.createElement("span");
             chip.className = "px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-800 text-slate-300 border border-slate-700";
             chip.textContent = catName;
             chipsDiv.appendChild(chip);
           });
-
           card.appendChild(chipsDiv);
         }
-
         container.appendChild(card);
       });
     }
 
-    // ==========================================
-    // 5-D. 통합 뷰 전환 및 렌더링 컨트롤러
-    // ==========================================
     function renderCurrentViz() {
       const currentSelected = alertsData.find(a => String(a.id) === String(selectedAlertId));
-
       const emptyStateEl = document.getElementById("vizEmptyState");
       const vizContentEl = document.getElementById("vizContent");
 
@@ -2229,35 +2100,19 @@
 
     function switchVizTab(tab) {
       currentVizTab = tab;
-
       const flowBtn = document.getElementById("tabBtnFlow");
       const topoBtn = document.getElementById("tabBtnTopology");
       const osiBtn = document.getElementById("tabBtnOsi");
-
-      const flowView = document.getElementById("vizViewFlow");
-      const topoView = document.getElementById("vizViewTopology");
-      const osiView = document.getElementById("vizViewOsi");
-
       const activeClass = "px-2.5 py-1 rounded-md font-semibold transition bg-indigo-600 text-white";
       const inactiveClass = "px-2.5 py-1 rounded-md font-semibold transition text-slate-400 hover:text-slate-200";
 
-      if (flowBtn) {
-        flowBtn.className = tab === "flow" ? activeClass : inactiveClass;
-        flowBtn.setAttribute("aria-selected", tab === "flow" ? "true" : "false");
-      }
-      if (topoBtn) {
-        topoBtn.className = tab === "topology" ? activeClass : inactiveClass;
-        topoBtn.setAttribute("aria-selected", tab === "topology" ? "true" : "false");
-      }
-      if (osiBtn) {
-        osiBtn.className = tab === "osi" ? activeClass : inactiveClass;
-        osiBtn.setAttribute("aria-selected", tab === "osi" ? "true" : "false");
-      }
+      if (flowBtn) { flowBtn.className = tab === "flow" ? activeClass : inactiveClass; flowBtn.setAttribute("aria-selected", String(tab === "flow")); }
+      if (topoBtn) { topoBtn.className = tab === "topology" ? activeClass : inactiveClass; topoBtn.setAttribute("aria-selected", String(tab === "topology")); }
+      if (osiBtn) { osiBtn.className = tab === "osi" ? activeClass : inactiveClass; osiBtn.setAttribute("aria-selected", String(tab === "osi")); }
 
-      if (flowView) flowView.classList.toggle("hidden", tab !== "flow");
-      if (topoView) topoView.classList.toggle("hidden", tab !== "topology");
-      if (osiView) osiView.classList.toggle("hidden", tab !== "osi");
-
+      document.getElementById("vizViewFlow")?.classList.toggle("hidden", tab !== "flow");
+      document.getElementById("vizViewTopology")?.classList.toggle("hidden", tab !== "topology");
+      document.getElementById("vizViewOsi")?.classList.toggle("hidden", tab !== "osi");
       renderCurrentViz();
     }
 
@@ -2289,10 +2144,7 @@
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload)
         });
-        if (!res.ok) {
-          const errText = await res.text();
-          throw new Error(`HTTP ${res.status} ${errText}`);
-        }
+        if (!res.ok) throw new Error(`HTTP ${res.status} ${await res.text()}`);
         setStatus(`✅ 경보 #${selectedAlertId} 트리아지 저장 완료`);
         await fetchDashboardData();
         const updated = alertsData.find(a => String(a.id) === String(selectedAlertId));
@@ -2305,26 +2157,17 @@
     document.getElementById("pcapFileInput").addEventListener("change", async (e) => {
       const file = e.target.files[0];
       if (!file) return;
-
       if (!isLiveMode) {
         setStatus(`🟡 [Mock] '${file.name}' 업로드 시뮬레이션 완료 (Live API 모드에서 실제 전송됩니다)`);
         e.target.value = "";
         return;
       }
-
       const formData = new FormData();
       formData.append("file", file);
-
       try {
         setStatus(`⏳ '${file.name}' 업로드 및 Suricata 분석 요청 중...`);
-        const res = await fetch(`${API_BASE}/api/pcap/upload`, {
-          method: "POST",
-          body: formData
-        });
-        if (!res.ok) {
-          const errBody = await res.text();
-          throw new Error(`HTTP ${res.status} - ${errBody || "서버 오류"}`);
-        }
+        const res = await fetch(`${API_BASE}/api/pcap/upload`, { method: "POST", body: formData });
+        if (!res.ok) throw new Error(`HTTP ${res.status} - ${await res.text() || "서버 오류"}`);
         setStatus(`✅ '${file.name}' 분석 완료! 경보를 갱신합니다.`);
         fetchDashboardData();
       } catch (err) {
@@ -2358,7 +2201,6 @@
         setStatus("🔴 내보낼 경보 데이터가 없습니다.", true);
         return;
       }
-
       const tpAlerts = alertsData.filter(a => a.verdict === "TP");
       const targetAlerts = tpAlerts.length > 0 ? tpAlerts : alertsData;
       const scopeLabel = tpAlerts.length > 0 ? "정탐(TP) 확정 경보 기준" : "전체 탐지 경보 기준";
@@ -2371,7 +2213,6 @@
 
       targetAlerts.forEach((a, idx) => {
         const groups = extractPlaybookGroups(a);
-
         md += `## ${idx + 1}. [${a.severity || "SEV4"}] ${a.signature || "Unknown Signature"}\n\n`;
         md += `| 항목 | 내용 |\n|---|---|\n`;
         md += `| **발생 시각** | ${a.timestamp || "-"} |\n`;
@@ -2380,23 +2221,14 @@
         md += `| **출발지 → 목적지** | \`${a.src_ip || "-"}\` → \`${a.dest_ip || "-"}:${a.dest_port ?? "-"}\` |\n`;
         md += `| **HTTP 상태 / 확정위험** | ${a.http_status ?? "-"} / ${a.is_confirmed_risk ? "예 (격상됨)" : "아니오"} |\n`;
         md += `| **판정 / 신뢰도** | **${a.verdict || "UNREVIEWED"}** (${a.confidence || "MEDIUM"}) |\n\n`;
-
-        md += `### 1) 관찰된 사실 (Observation / Fact)\n`;
-        md += `${a.observation ? a.observation : "_작성된 관찰 사실 없음_"}\n\n`;
-
-        md += `### 2) 분석가 추정 (Assessment)\n`;
-        md += `${a.assessment ? a.assessment : "_작성된 분석가 추정 없음_"}\n\n`;
-
+        md += `### 1) 관찰된 사실 (Observation / Fact)\n${a.observation || "_작성된 관찰 사실 없음_"}\n\n`;
+        md += `### 2) 분석가 추정 (Assessment)\n${a.assessment || "_작성된 분석가 추정 없음_"}\n\n`;
         md += `### 3) 대응 플레이북 (수동 적용 안내)\n`;
         if (groups.length === 0) {
           md += `_명령어 없음_\n\n`;
         } else {
           groups.forEach(g => {
-            md += `#### ${g.env}\n\`\`\`bash\n`;
-            md += `# [검증]\n${g.verify || "명령어 없음"}\n\n`;
-            md += `# [차단]\n${g.block || "명령어 없음"}\n\n`;
-            md += `# [롤백]\n${g.rollback || "명령어 없음"}\n`;
-            md += `\`\`\`\n\n`;
+            md += `#### ${g.env}\n\`\`\`bash\n# [검증]\n${g.verify || "명령어 없음"}\n\n# [차단]\n${g.block || "명령어 없음"}\n\n# [롤백]\n${g.rollback || "명령어 없음"}\n\`\`\`\n\n`;
           });
         }
         md += `---\n\n`;
@@ -2410,17 +2242,14 @@
       link.download = `mini-siem-report-${dateTag}.md`;
       link.click();
       URL.revokeObjectURL(url);
-
       setStatus(`✅ 침해사고 보고서(mini-siem-report-${dateTag}.md) 다운로드 완료`);
     }
 
-    // 필터, 검색, 보고서 내보내기 이벤트 연결
     document.getElementById("filterCategory").addEventListener("change", renderAlertTable);
     document.getElementById("filterSeverity").addEventListener("change", renderAlertTable);
     document.getElementById("filterVerdict").addEventListener("change", renderAlertTable);
     document.getElementById("searchKeyword").addEventListener("input", renderAlertTable);
     document.getElementById("btnExportReport").addEventListener("click", exportIncidentReport);
-
     document.getElementById("tabBtnFlow").addEventListener("click", () => switchVizTab("flow"));
     document.getElementById("tabBtnTopology").addEventListener("click", () => switchVizTab("topology"));
     document.getElementById("tabBtnOsi").addEventListener("click", () => switchVizTab("osi"));
@@ -2428,18 +2257,15 @@
     // ==========================================
     // 7. 분석 통계 모듈 (1~4순위 통합 + 메인 탭 전환)
     // ==========================================
-    let currentMainView = "soc"; // "soc" | "analytics"
+    let currentMainView = "soc";
     let timelineChartInstance = null;
-    let timelineGranularity = "minute"; // "minute" | "hour"
+    let timelineGranularity = "minute";
     let ruleVerdictChartInstance = null;
     let summaryComboChartInstance = null;
 
-    // --- [1순위] 시간대별 경보 타임라인 ---
     function calcAlertTimeline(items, granularity = "minute") {
       const buckets = new Map();
-      const sorted = [...(items || [])].sort(
-        (a, b) => new Date(a.timestamp || 0) - new Date(b.timestamp || 0)
-      );
+      const sorted = [...(items || [])].sort((a, b) => new Date(a.timestamp || 0) - new Date(b.timestamp || 0));
       sorted.forEach(alert => {
         if (!alert.timestamp) return;
         const timePart = String(alert.timestamp).slice(11, 16);
@@ -2465,10 +2291,7 @@
       if (!canvas) return;
       const { labels, series } = calcAlertTimeline(items, timelineGranularity);
       const datasets = ["SEV1", "SEV2", "SEV3", "SEV4"].map(sev => ({
-        label: sev,
-        data: series[sev],
-        backgroundColor: getSeverityHexColor(sev),
-        borderRadius: 3
+        label: sev, data: series[sev], backgroundColor: getSeverityHexColor(sev), borderRadius: 3
       }));
       if (!timelineChartInstance) {
         timelineChartInstance = new Chart(canvas.getContext("2d"), {
@@ -2491,16 +2314,13 @@
       }
     }
 
-    // --- [2순위] 룰별(SID) 정탐/오탐 비율 ---
     function calcRuleVerdictStats(items) {
       const map = new Map();
       (items || []).forEach(alert => {
         const sid = alert.sid ?? "UNKNOWN";
         const cat = String(alert.category || "unknown").toUpperCase();
         const key = String(sid);
-        if (!map.has(key)) {
-          map.set(key, { sid: key, label: `${key} (${cat})`, TP: 0, FP: 0, UNREVIEWED: 0, total: 0 });
-        }
+        if (!map.has(key)) map.set(key, { sid: key, label: `${key} (${cat})`, TP: 0, FP: 0, UNREVIEWED: 0, total: 0 });
         const row = map.get(key);
         const verdict = ["TP", "FP", "UNREVIEWED"].includes(alert.verdict) ? alert.verdict : "UNREVIEWED";
         row[verdict] += 1;
@@ -2558,7 +2378,6 @@
       }
     }
 
-    // --- [3순위] MITRE ATT&CK 커버리지 ---
     const MITRE_TACTICS_CATALOG = [
       { id: "TA0007", name: "정찰 (Discovery)", techniques: [{ id: "T1046", name: "Network Service Discovery", categories: ["portscan"] }] },
       { id: "TA0001", name: "최초 침투 (Initial Access)", techniques: [
@@ -2601,12 +2420,9 @@
 
       const totalTactics = MITRE_TACTICS_CATALOG.length;
       return {
-        totalTactics,
-        coveredTactics,
+        totalTactics, coveredTactics,
         coveragePct: totalTactics > 0 ? ((coveredTactics / totalTactics) * 100).toFixed(1) : "0.0",
-        totalTechniques,
-        activeTechniques,
-        tactics
+        totalTechniques, activeTechniques, tactics
       };
     }
 
@@ -2679,7 +2495,6 @@
       });
     }
 
-    // --- [4순위] 종합 그래프 (Executive Summary) ---
     function calcExecutiveSummary(items) {
       const alertList = items || [];
       const rows = BASE_CATEGORIES.map(cat => {
@@ -2688,9 +2503,7 @@
         const highRisk = matched.filter(a => a.severity === "SEV1" || a.severity === "SEV2").length;
         const reviewed = matched.filter(a => a.verdict === "TP" || a.verdict === "FP").length;
         return {
-          label: cat.label,
-          total,
-          highRisk,
+          label: cat.label, total, highRisk,
           reviewRate: total > 0 ? Number(((reviewed / total) * 100).toFixed(1)) : 0
         };
       });
@@ -2734,7 +2547,6 @@
       }
     }
 
-    // --- 통계 탭 전체 렌더링 & 화면 전환 ---
     function renderAnalyticsDashboard() {
       renderSummaryComboChart(alertsData);
       renderTimelineChart(alertsData);
@@ -2759,7 +2571,6 @@
       if (!isSoc) renderAnalyticsDashboard();
     }
 
-    // 메인 탭 & 타임라인 단위 전환 이벤트 연결
     document.getElementById("mainTabSoc")?.addEventListener("click", () => switchMainView("soc"));
     document.getElementById("mainTabAnalytics")?.addEventListener("click", () => switchMainView("analytics"));
 
@@ -2775,6 +2586,309 @@
       document.getElementById("btnTimelineMin").className = "px-2.5 py-1 rounded font-semibold text-slate-400 hover:text-white transition";
       renderTimelineChart(alertsData);
     });
+
+    // ==========================================
+    // 8. 알림봇(웹 토스트 + Audit Feed + Discord) & 승인 기반 임시 대응(SOAR 시뮬레이션)
+    // ==========================================
+    const CONT_DURATION_MS = 10 * 60 * 1000; // 10분 임시 격리
+    const containedIps = new Map();
+    const notifiedAlertIds = new Set();
+    const webNotificationFeed = [];
+
+    function getWebhookUrl() {
+      return sessionStorage.getItem("minisiem_discord_webhook") || "";
+    }
+
+    function isAutoNotifyEnabled() {
+      return sessionStorage.getItem("minisiem_auto_sev1") === "true";
+    }
+
+    function isIpContained(ip) {
+      if (!ip || !containedIps.has(ip)) return false;
+      const info = containedIps.get(ip);
+      if (Date.now() >= info.expiresAt) {
+        containedIps.delete(ip);
+        return false;
+      }
+      return true;
+    }
+
+    function getRemainingSec(ip) {
+      const info = containedIps.get(ip);
+      if (!info) return 0;
+      return Math.max(0, Math.ceil((info.expiresAt - Date.now()) / 1000));
+    }
+
+    function embedColorToHex(colorInt) {
+      if (colorInt === 16007990) return "#f43f5e";
+      if (colorInt === 16098851) return "#f59e0b";
+      if (colorInt === 1096065)  return "#10b981";
+      return "#38bdf8";
+    }
+
+    function pushWebNotification(embedPayload, channelLabel) {
+      const nowTime = new Date().toLocaleTimeString("ko-KR");
+      const accentHex = embedColorToHex(embedPayload.color);
+
+      webNotificationFeed.unshift({
+        time: nowTime,
+        channel: channelLabel,
+        accentHex,
+        title: embedPayload.title || "보안 알림",
+        description: embedPayload.description || "",
+        fields: Array.isArray(embedPayload.fields) ? embedPayload.fields : []
+      });
+
+      const countEl = document.getElementById("notifFeedCount");
+      if (countEl) countEl.textContent = String(webNotificationFeed.length);
+      renderNotifFeedList();
+
+      const container = document.getElementById("webToastContainer");
+      if (!container) return;
+
+      const toast = document.createElement("div");
+      toast.className = "pointer-events-auto bg-slate-900 border border-slate-700 rounded-lg p-3 shadow-2xl text-xs space-y-1.5 transition-opacity duration-300";
+      toast.style.borderLeft = `4px solid ${accentHex}`;
+
+      const topRow = document.createElement("div");
+      topRow.className = "flex items-center justify-between gap-2";
+
+      const titleEl = document.createElement("span");
+      titleEl.className = "font-bold text-slate-100 truncate";
+      titleEl.textContent = embedPayload.title || "보안 알림";
+
+      const chBadge = document.createElement("span");
+      chBadge.className = "text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 whitespace-nowrap";
+      chBadge.textContent = channelLabel;
+
+      topRow.append(titleEl, chBadge);
+      toast.appendChild(topRow);
+
+      if (embedPayload.description) {
+        const descEl = document.createElement("div");
+        descEl.className = "text-slate-300 line-clamp-2";
+        descEl.textContent = embedPayload.description;
+        toast.appendChild(descEl);
+      }
+
+      const timeEl = document.createElement("div");
+      timeEl.className = "text-[10px] text-slate-500 font-mono";
+      timeEl.textContent = nowTime;
+      toast.appendChild(timeEl);
+
+      container.appendChild(toast);
+
+      setTimeout(() => {
+        toast.style.opacity = "0";
+        setTimeout(() => toast.remove(), 300);
+      }, 4500);
+    }
+
+    function renderNotifFeedList() {
+      const listEl = document.getElementById("notifFeedList");
+      if (!listEl) return;
+      listEl.textContent = "";
+
+      if (webNotificationFeed.length === 0) {
+        const empty = document.createElement("div");
+        empty.className = "text-center py-8 text-slate-500";
+        empty.textContent = "아직 기록된 알림 이력이 없습니다.";
+        listEl.appendChild(empty);
+        return;
+      }
+
+      webNotificationFeed.forEach(item => {
+        const card = document.createElement("div");
+        card.className = "bg-slate-950 border border-slate-800 rounded-lg p-3 space-y-1.5";
+        card.style.borderLeft = `4px solid ${item.accentHex}`;
+
+        const header = document.createElement("div");
+        header.className = "flex items-center justify-between gap-2";
+        const title = document.createElement("span");
+        title.className = "font-bold text-slate-100";
+        title.textContent = item.title;
+        const meta = document.createElement("span");
+        meta.className = "text-[10px] font-mono text-slate-400";
+        meta.textContent = `${item.channel} · ${item.time}`;
+        header.append(title, meta);
+        card.appendChild(header);
+
+        if (item.description) {
+          const desc = document.createElement("div");
+          desc.className = "text-slate-300";
+          desc.textContent = item.description;
+          card.appendChild(desc);
+        }
+
+        if (item.fields.length > 0) {
+          const fieldsWrap = document.createElement("div");
+          fieldsWrap.className = "grid grid-cols-2 gap-1.5 pt-1 text-[11px] text-slate-400";
+          item.fields.forEach(f => {
+            const fDiv = document.createElement("div");
+            fDiv.textContent = `${f.name}: ${String(f.value).replaceAll("`", "")}`;
+            fieldsWrap.appendChild(fDiv);
+          });
+          card.appendChild(fieldsWrap);
+        }
+        listEl.appendChild(card);
+      });
+    }
+
+    function updateContainmentUI(alert) {
+      const badge = document.getElementById("containmentStatusBadge");
+      const btn = document.getElementById("btnToggleContainment");
+      if (!badge || !btn || !alert) return;
+
+      const ip = alert.src_ip;
+      if (isIpContained(ip)) {
+        const sec = getRemainingSec(ip);
+        const mm = String(Math.floor(sec / 60)).padStart(2, "0");
+        const ss = String(sec % 60).padStart(2, "0");
+        badge.textContent = `🔒 격리 중 (${mm}:${ss} 남음)`;
+        badge.className = "text-[11px] font-bold text-rose-400";
+        btn.textContent = "🔓 임시 차단 해제 (롤백)";
+        btn.className = "bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-2 px-3 rounded-lg transition";
+      } else {
+        badge.textContent = "격리 안 됨 (정상 통신)";
+        badge.className = "text-[11px] text-slate-500";
+        btn.textContent = "🛡️ 출발지 IP 임시 차단 (10분)";
+        btn.className = "bg-rose-600 hover:bg-rose-500 text-white font-semibold py-2 px-3 rounded-lg transition";
+      }
+    }
+
+    async function sendDiscordWebhook(embedPayload) {
+      const url = getWebhookUrl();
+
+      if (!url) {
+        pushWebNotification(embedPayload, "웹 시뮬레이션");
+        setStatus("🔔 [웹 알림 출력] Discord URL 미설정 상태이므로 웹 화면에만 출력했습니다.");
+        return true;
+      }
+
+      try {
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username: "Mini-SIEM SOC Bot", embeds: [embedPayload] })
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        pushWebNotification(embedPayload, "Web + Discord");
+        return true;
+      } catch (err) {
+        pushWebNotification(embedPayload, "웹 출력 (Discord 실패)");
+        setStatus(`🔴 Discord 발송 실패 (${err.message}) · 웹 화면에는 기록되었습니다.`, true);
+        return false;
+      }
+    }
+
+    function buildAlertEmbed(alert, titlePrefix = "🚨 보안 경보 알림") {
+      const colorMap = { SEV1: 16007990, SEV2: 16098851, SEV3: 3718648, SEV4: 9741240 };
+      return {
+        title: `${titlePrefix} [${alert.severity || "SEV4"}]`,
+        description: alert.signature || "Unknown Signature",
+        color: colorMap[alert.severity] || 3718648,
+        fields: [
+          { name: "카테고리 / SID", value: `${String(alert.category || "-").toUpperCase()} (${alert.sid ?? "-"})`, inline: true },
+          { name: "MITRE ATT&CK", value: alert.mitre_id || "-", inline: true },
+          { name: "출발지 → 목적지", value: `\`${alert.src_ip || "-"}\` → \`${alert.dest_ip || "-"}:${alert.dest_port ?? "-"}\``, inline: false },
+          { name: "판정 상태", value: alert.verdict || "UNREVIEWED", inline: true }
+        ],
+        footer: { text: "Mini-SIEM SOC Dashboard · Human-in-the-Loop" },
+        timestamp: new Date().toISOString()
+      };
+    }
+
+    async function checkAndAutoNotifySev1(items) {
+      if (!isAutoNotifyEnabled()) return;
+      for (const alert of (items || [])) {
+        const key = String(alert.id);
+        if (alert.severity === "SEV1" && !notifiedAlertIds.has(key)) {
+          notifiedAlertIds.add(key);
+          await sendDiscordWebhook(buildAlertEmbed(alert, "🚨 [자동 알림] 고위험 경보 탐지"));
+        }
+      }
+    }
+
+    document.getElementById("btnAlertBotModal")?.addEventListener("click", () => {
+      document.getElementById("discordWebhookInput").value = getWebhookUrl();
+      document.getElementById("autoNotifySev1").checked = isAutoNotifyEnabled();
+      document.getElementById("alertBotModal").classList.remove("hidden");
+    });
+    document.getElementById("btnCloseBotModal")?.addEventListener("click", () => {
+      document.getElementById("alertBotModal").classList.add("hidden");
+    });
+    document.getElementById("btnSaveBotConfig")?.addEventListener("click", () => {
+      const url = document.getElementById("discordWebhookInput").value.trim();
+      const autoSev1 = document.getElementById("autoNotifySev1").checked;
+      sessionStorage.setItem("minisiem_discord_webhook", url);
+      sessionStorage.setItem("minisiem_auto_sev1", String(autoSev1));
+      document.getElementById("alertBotModal").classList.add("hidden");
+      setStatus("✅ 알림봇 설정이 세션에 저장되었습니다.");
+    });
+    document.getElementById("btnTestDiscord")?.addEventListener("click", async () => {
+      const url = document.getElementById("discordWebhookInput").value.trim();
+      sessionStorage.setItem("minisiem_discord_webhook", url);
+      const ok = await sendDiscordWebhook({
+        title: "✅ Mini-SIEM 알림봇 연동 테스트 성공",
+        description: "실시간 고위험(SEV1) 경보 및 임시 차단 알림을 받을 준비가 완료되었습니다.",
+        color: 1096065,
+        timestamp: new Date().toISOString()
+      });
+      if (ok && url) setStatus("✅ Discord 및 웹 화면에 테스트 알림을 발송했습니다.");
+    });
+
+    document.getElementById("btnNotifFeedModal")?.addEventListener("click", () => {
+      renderNotifFeedList();
+      document.getElementById("notifFeedModal").classList.remove("hidden");
+    });
+    document.getElementById("btnCloseNotifFeed")?.addEventListener("click", () => {
+      document.getElementById("notifFeedModal").classList.add("hidden");
+    });
+    document.getElementById("btnCloseNotifFeedBottom")?.addEventListener("click", () => {
+      document.getElementById("notifFeedModal").classList.add("hidden");
+    });
+    document.getElementById("btnClearNotifFeed")?.addEventListener("click", () => {
+      webNotificationFeed.length = 0;
+      const countEl = document.getElementById("notifFeedCount");
+      if (countEl) countEl.textContent = "0";
+      renderNotifFeedList();
+    });
+
+    document.getElementById("btnToggleContainment")?.addEventListener("click", async () => {
+      const alert = alertsData.find(a => String(a.id) === String(selectedAlertId));
+      if (!alert || !alert.src_ip) return;
+      const ip = alert.src_ip;
+
+      if (isIpContained(ip)) {
+        containedIps.delete(ip);
+        pushWebNotification({
+          title: `🔓 [임시 대응 해제] ${ip}`,
+          description: "분석가 승인에 따라 임시 격리가 해제(롤백)되었습니다.",
+          color: 1096065
+        }, "SOAR 롤백");
+        setStatus(`🔓 [임시 대응 해제] ${ip} 격리가 해제되었습니다.`);
+      } else {
+        containedIps.set(ip, { expiresAt: Date.now() + CONT_DURATION_MS });
+        setStatus(`🛡️ [승인 기반 임시 차단] ${ip} 10분 임시 격리 적용됨 (시뮬레이션)`);
+        await sendDiscordWebhook(buildAlertEmbed(alert, "🛡️ [임시 차단 적용] 10분 격리"));
+      }
+      updateContainmentUI(alert);
+      renderAlertTable();
+    });
+
+    document.getElementById("btnSendDiscordAlert")?.addEventListener("click", async () => {
+      const alert = alertsData.find(a => String(a.id) === String(selectedAlertId));
+      if (!alert) return;
+      const ok = await sendDiscordWebhook(buildAlertEmbed(alert));
+      if (ok && getWebhookUrl()) setStatus(`✅ 경보 #${alert.id} 웹 및 Discord 알림 발송 완료`);
+    });
+
+    setInterval(() => {
+      if (selectedAlertId !== null) {
+        const alert = alertsData.find(a => String(a.id) === String(selectedAlertId));
+        if (alert) updateContainmentUI(alert);
+      }
+    }, 1000);
 
     // 초기 실행
     startPolling();
