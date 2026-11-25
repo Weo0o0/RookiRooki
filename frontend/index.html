@@ -102,263 +102,343 @@
   <!-- 메인 컨테이너 -->
   <main class="p-6 max-w-[1600px] mx-auto space-y-6">
 
-    <!-- 상단 KPI 카드 + 6종 카테고리 차트 -->
-    <section class="grid grid-cols-1 lg:grid-cols-12 gap-4">
-      <div class="lg:col-span-8 grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
-          <p class="text-xs text-slate-400">전체 경보</p>
-          <p id="kpiTotal" class="text-2xl font-bold mt-1 text-white">0</p>
-        </div>
-        <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
-          <p class="text-xs text-slate-400">고위험 (SEV1~2)</p>
-          <p id="kpiHigh" class="text-2xl font-bold mt-1 text-rose-400">0</p>
-        </div>
-        <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
-          <p class="text-xs text-slate-400">확정 위험 (200 격상 등)</p>
-          <p id="kpiConfirmed" class="text-2xl font-bold mt-1 text-amber-400">0</p>
-        </div>
-        <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
-          <p class="text-xs text-slate-400">미검토 (UNREVIEWED)</p>
-          <p id="kpiUnreviewed" class="text-2xl font-bold mt-1 text-sky-400">0</p>
-        </div>
-      </div>
+    <!-- 메인 화면 전환 탭 (실시간 관제 / 분석 통계) -->
+    <div role="tablist" aria-label="메인 대시보드 전환" class="flex items-center gap-2 border-b border-slate-800 pb-3">
+      <button type="button" id="mainTabSoc" role="tab" aria-selected="true" aria-controls="viewSoc"
+        class="px-4 py-2 rounded-lg text-xs font-bold bg-sky-600 text-white transition">
+        🛡️ 실시간 관제 (SOC)
+      </button>
+      <button type="button" id="mainTabAnalytics" role="tab" aria-selected="false" aria-controls="viewAnalytics"
+        class="px-4 py-2 rounded-lg text-xs font-bold bg-slate-900 text-slate-400 hover:text-white border border-slate-800 transition">
+        📊 분석 통계 (Analytics)
+      </button>
+    </div>
 
-      <!-- 6종 공격 카테고리 분포 차트 -->
-      <div class="lg:col-span-4 bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col justify-center">
-        <p class="text-xs text-slate-400 mb-2">공격 카테고리 분포 (6종 + 기타)</p>
-        <div class="h-24">
-          <canvas id="categoryChart"></canvas>
-        </div>
-      </div>
-    </section>
+    <!-- [탭 1] 실시간 관제 (SOC) 영역 -->
+    <div id="viewSoc" role="tabpanel" aria-labelledby="mainTabSoc" class="space-y-6">
 
-    <!-- 하단 2단 레이아웃: 좌측 경보 목록 / 우측 상세·트리아지·플레이북 -->
-    <section class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-
-      <!-- 좌측: 실시간 경보 테이블 -->
-      <div class="lg:col-span-7 bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
-        <div class="p-4 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3">
-          <h2 class="text-sm font-semibold text-slate-200">실시간 탐지 경보</h2>
-          <div class="flex flex-wrap gap-2 text-xs">
-            <input
-              type="text"
-              id="searchKeyword"
-              placeholder="IP, 시그니처, URL 검색..."
-              class="bg-slate-800 border border-slate-700 rounded px-2.5 py-1 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-sky-500 w-44"
-            />
-            <select id="filterVerdict" class="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-slate-200">
-              <option value="ALL">전체 판정</option>
-              <option value="UNREVIEWED">미검토 (UNREVIEWED)</option>
-              <option value="TP">정탐 (TP)</option>
-              <option value="FP">오탐 (FP)</option>
-            </select>
-            <!-- 6종 카테고리 필터 -->
-            <select id="filterCategory" class="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-slate-200">
-              <option value="ALL">전체 카테고리</option>
-              <option value="sqli">SQLi (1000001)</option>
-              <option value="xss">XSS (1000002)</option>
-              <option value="bruteforce">BruteForce (1000003)</option>
-              <option value="portscan">PortScan (1000004)</option>
-              <option value="c2_beacon">C2 Beacon (1000005)</option>
-              <option value="ssrf">SSRF (1000006)</option>
-            </select>
-            <select id="filterSeverity" class="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-slate-200">
-              <option value="ALL">전체 심각도</option>
-              <option value="SEV1">SEV1</option>
-              <option value="SEV2">SEV2</option>
-              <option value="SEV3">SEV3</option>
-              <option value="SEV4">SEV4</option>
-            </select>
+      <!-- 상단 KPI 카드 + 6종 카테고리 차트 -->
+      <section class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+        <div class="lg:col-span-8 grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
+            <p class="text-xs text-slate-400">전체 경보</p>
+            <p id="kpiTotal" class="text-2xl font-bold mt-1 text-white">0</p>
+          </div>
+          <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
+            <p class="text-xs text-slate-400">고위험 (SEV1~2)</p>
+            <p id="kpiHigh" class="text-2xl font-bold mt-1 text-rose-400">0</p>
+          </div>
+          <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
+            <p class="text-xs text-slate-400">확정 위험 (200 격상 등)</p>
+            <p id="kpiConfirmed" class="text-2xl font-bold mt-1 text-amber-400">0</p>
+          </div>
+          <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
+            <p class="text-xs text-slate-400">미검토 (UNREVIEWED)</p>
+            <p id="kpiUnreviewed" class="text-2xl font-bold mt-1 text-sky-400">0</p>
           </div>
         </div>
 
-        <div class="overflow-x-auto">
-          <table class="w-full text-left text-xs">
-            <thead class="bg-slate-800/60 text-slate-400 border-b border-slate-800">
-              <tr>
-                <th class="px-4 py-3">시각</th>
-                <th class="px-3 py-3">심각도</th>
-                <th class="px-3 py-3">카테고리 / 시그니처</th>
-                <th class="px-3 py-3">출발지 → 목적지</th>
-                <th class="px-3 py-3">판정</th>
-              </tr>
-            </thead>
-            <tbody id="alertTableBody" class="divide-y divide-slate-800">
-              <!-- JS로 안전하게 렌더링됨 -->
-            </tbody>
-          </table>
+        <!-- 6종 공격 카테고리 분포 차트 -->
+        <div class="lg:col-span-4 bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col justify-center">
+          <p class="text-xs text-slate-400 mb-2">공격 카테고리 분포 (6종 + 기타)</p>
+          <div class="h-24">
+            <canvas id="categoryChart"></canvas>
+          </div>
         </div>
-      </div>
+      </section>
 
-      <!-- 우측: 경보 상세, 트리아지, 플레이북 패널 -->
-      <div class="lg:col-span-5 bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-5">
-        <div id="emptyDetail" class="text-center py-12 text-slate-500 text-sm">
-          좌측 목록에서 경보를 선택하면 상세 분석 및 대응 플레이북이 표시됩니다.
-        </div>
+      <!-- 하단 2단 레이아웃: 좌측 경보 목록 / 우측 상세·트리아지·플레이북 -->
+      <section class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
 
-        <div id="detailPanel" class="hidden space-y-5">
-          <!-- 1. 경보 메타데이터 -->
-          <div class="border-b border-slate-800 pb-4 space-y-2">
-            <div class="flex items-center justify-between">
-              <span id="detailSevBadge" class="px-2 py-0.5 rounded text-xs font-bold"></span>
-              <span id="detailMitre" class="text-xs font-mono text-sky-400"></span>
+        <!-- 좌측: 실시간 경보 테이블 -->
+        <div class="lg:col-span-7 bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+          <div class="p-4 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3">
+            <h2 class="text-sm font-semibold text-slate-200">실시간 탐지 경보</h2>
+            <div class="flex flex-wrap gap-2 text-xs">
+              <input
+                type="text"
+                id="searchKeyword"
+                placeholder="IP, 시그니처, URL 검색..."
+                class="bg-slate-800 border border-slate-700 rounded px-2.5 py-1 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-sky-500 w-44"
+              />
+              <select id="filterVerdict" class="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-slate-200">
+                <option value="ALL">전체 판정</option>
+                <option value="UNREVIEWED">미검토 (UNREVIEWED)</option>
+                <option value="TP">정탐 (TP)</option>
+                <option value="FP">오탐 (FP)</option>
+              </select>
+              <!-- 6종 카테고리 필터 -->
+              <select id="filterCategory" class="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-slate-200">
+                <option value="ALL">전체 카테고리</option>
+                <option value="sqli">SQLi (1000001)</option>
+                <option value="xss">XSS (1000002)</option>
+                <option value="bruteforce">BruteForce (1000003)</option>
+                <option value="portscan">PortScan (1000004)</option>
+                <option value="c2_beacon">C2 Beacon (1000005)</option>
+                <option value="ssrf">SSRF (1000006)</option>
+              </select>
+              <select id="filterSeverity" class="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-slate-200">
+                <option value="ALL">전체 심각도</option>
+                <option value="SEV1">SEV1</option>
+                <option value="SEV2">SEV2</option>
+                <option value="SEV3">SEV3</option>
+                <option value="SEV4">SEV4</option>
+              </select>
             </div>
-            <h3 id="detailSignature" class="text-base font-bold text-white"></h3>
-            <div class="grid grid-cols-2 gap-2 text-xs text-slate-300 bg-slate-950 p-3 rounded-lg border border-slate-800">
-              <div><span class="text-slate-500">SID:</span> <span id="detailSid" class="font-mono"></span></div>
-              <div><span class="text-slate-500">HTTP Status:</span> <span id="detailHttp" class="font-mono"></span></div>
-              <div><span class="text-slate-500">출발지 IP:</span> <span id="detailSrc" class="font-mono text-rose-300"></span></div>
-              <div><span class="text-slate-500">목적지:</span> <span id="detailDest" class="font-mono text-emerald-300"></span></div>
-              <div class="col-span-2 break-all">
-                <span class="text-slate-500">Raw URL:</span>
-                <code id="detailUrl" class="text-amber-300 font-mono"></code>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-800/60 text-slate-400 border-b border-slate-800">
+                <tr>
+                  <th class="px-4 py-3">시각</th>
+                  <th class="px-3 py-3">심각도</th>
+                  <th class="px-3 py-3">카테고리 / 시그니처</th>
+                  <th class="px-3 py-3">출발지 → 목적지</th>
+                  <th class="px-3 py-3">판정</th>
+                </tr>
+              </thead>
+              <tbody id="alertTableBody" class="divide-y divide-slate-800">
+                <!-- JS로 안전하게 렌더링됨 -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 우측: 경보 상세, 트리아지, 플레이북 패널 -->
+        <div class="lg:col-span-5 bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-5">
+          <div id="emptyDetail" class="text-center py-12 text-slate-500 text-sm">
+            좌측 목록에서 경보를 선택하면 상세 분석 및 대응 플레이북이 표시됩니다.
+          </div>
+
+          <div id="detailPanel" class="hidden space-y-5">
+            <!-- 1. 경보 메타데이터 -->
+            <div class="border-b border-slate-800 pb-4 space-y-2">
+              <div class="flex items-center justify-between">
+                <span id="detailSevBadge" class="px-2 py-0.5 rounded text-xs font-bold"></span>
+                <span id="detailMitre" class="text-xs font-mono text-sky-400"></span>
               </div>
-              <div class="col-span-2 flex gap-2 pt-1" id="detailFlags"></div>
+              <h3 id="detailSignature" class="text-base font-bold text-white"></h3>
+              <div class="grid grid-cols-2 gap-2 text-xs text-slate-300 bg-slate-950 p-3 rounded-lg border border-slate-800">
+                <div><span class="text-slate-500">SID:</span> <span id="detailSid" class="font-mono"></span></div>
+                <div><span class="text-slate-500">HTTP Status:</span> <span id="detailHttp" class="font-mono"></span></div>
+                <div><span class="text-slate-500">출발지 IP:</span> <span id="detailSrc" class="font-mono text-rose-300"></span></div>
+                <div><span class="text-slate-500">목적지:</span> <span id="detailDest" class="font-mono text-emerald-300"></span></div>
+                <div class="col-span-2 break-all">
+                  <span class="text-slate-500">Raw URL:</span>
+                  <code id="detailUrl" class="text-amber-300 font-mono"></code>
+                </div>
+                <div class="col-span-2 flex gap-2 pt-1" id="detailFlags"></div>
+              </div>
+            </div>
+
+            <!-- 2. 트리아지(Triage) 입력 폼 -->
+            <div class="space-y-3 border-b border-slate-800 pb-4">
+              <h4 class="text-xs font-bold uppercase tracking-wider text-sky-400">트리아지 분석 (Fact vs Assessment 분리)</h4>
+
+              <div class="grid grid-cols-2 gap-3 text-xs">
+                <div>
+                  <label class="block text-slate-400 mb-1">판정 (Verdict)</label>
+                  <select id="triageVerdict" class="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1.5 text-white">
+                    <option value="UNREVIEWED">UNREVIEWED (미검토)</option>
+                    <option value="TP">TP (정탐)</option>
+                    <option value="FP">FP (오탐)</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-slate-400 mb-1">신뢰도 (Confidence)</label>
+                  <select id="triageConfidence" class="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1.5 text-white">
+                    <option value="HIGH">HIGH (높음)</option>
+                    <option value="MEDIUM">MEDIUM (보통)</option>
+                    <option value="LOW">LOW (낮음)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="text-xs">
+                <label class="block text-slate-400 mb-1">관찰된 사실 (Observation / Fact)</label>
+                <textarea id="triageObservation" rows="2" placeholder="예: 172.28.0.100에서 /login?id=' OR 1=1-- 요청 후 HTTP 200 응답 확인"
+                  class="w-full bg-slate-800 border border-slate-700 rounded p-2 text-white focus:outline-none focus:border-sky-500"></textarea>
+              </div>
+
+              <div class="text-xs">
+                <label class="block text-slate-400 mb-1">분석가 추정 (Assessment)</label>
+                <textarea id="triageAssessment" rows="2" placeholder="예: 인증 우회 시도가 성공했을 가능성이 높으며 추가 DB 접근 로그 확인 필요"
+                  class="w-full bg-slate-800 border border-slate-700 rounded p-2 text-white focus:outline-none focus:border-sky-500"></textarea>
+              </div>
+
+              <button id="btnSaveTriage" class="w-full bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold py-2 rounded-lg transition">
+                트리아지 결과 저장
+              </button>
+            </div>
+
+            <!-- 3. 대응 플레이북 (공식 actions.linux / actions.ufw 구조 · 복사 전용) -->
+            <div class="space-y-2">
+              <div class="flex items-center justify-between">
+                <h4 id="playbookTitle" class="text-xs font-bold uppercase tracking-wider text-amber-400">대응 플레이북 (CLI 안내용)</h4>
+                <span class="text-[11px] text-slate-500">자동 실행 안 함 · 복사 후 수동 적용</span>
+              </div>
+              <div id="playbookEvidenceNote" class="hidden text-[11px] bg-amber-500/10 border border-amber-500/30 text-amber-200 rounded-lg p-2"></div>
+              <div id="playbookContainer" class="space-y-2 text-xs">
+                <!-- JS로 치환된 명령어와 복사 버튼 렌더링 -->
+              </div>
+            </div>
+
+            <!-- 3-1. 분석 명령 안내 영역 (안내 전용 / 실행 버튼 없음) -->
+            <div id="analysisPanel" class="space-y-2 hidden">
+              <div class="flex items-center justify-between">
+                <h4 class="text-xs font-bold uppercase tracking-wider text-teal-400">분석 명령 안내</h4>
+                <span class="text-[11px] text-slate-500">조사 가이드 · 복사 후 터미널 수동 실행</span>
+              </div>
+              <div id="analysisContainer" class="space-y-3 text-xs">
+                <!-- createElement 및 textContent로 동적 생성 -->
+              </div>
             </div>
           </div>
 
-          <!-- 2. 트리아지(Triage) 입력 폼 -->
-          <div class="space-y-3 border-b border-slate-800 pb-4">
-            <h4 class="text-xs font-bold uppercase tracking-wider text-sky-400">트리아지 분석 (Fact vs Assessment 분리)</h4>
-
-            <div class="grid grid-cols-2 gap-3 text-xs">
+          <!-- 4. 시각화 (공격 스토리 & 공격 경로) 패널 -->
+          <div id="vizSection" class="border-t border-slate-800 pt-5 space-y-4">
+            <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2">
               <div>
-                <label class="block text-slate-400 mb-1">판정 (Verdict)</label>
-                <select id="triageVerdict" class="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1.5 text-white">
-                  <option value="UNREVIEWED">UNREVIEWED (미검토)</option>
-                  <option value="TP">TP (정탐)</option>
-                  <option value="FP">FP (오탐)</option>
-                </select>
+                <h4 class="text-xs font-bold uppercase tracking-wider text-indigo-400">시각화 분석</h4>
+                <span class="text-[11px] text-slate-500">공격 흐름 · 토폴로지 구성도 · 계층 뷰</span>
               </div>
-              <div>
-                <label class="block text-slate-400 mb-1">신뢰도 (Confidence)</label>
-                <select id="triageConfidence" class="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1.5 text-white">
-                  <option value="HIGH">HIGH (높음)</option>
-                  <option value="MEDIUM">MEDIUM (보통)</option>
-                  <option value="LOW">LOW (낮음)</option>
-                </select>
+              <!-- 보기 전환 세그먼트 버튼 3개 -->
+              <div role="tablist" aria-label="시각화 보기 전환" class="flex items-center bg-slate-950 p-1 rounded-lg border border-slate-800 text-xs">
+                <button type="button" id="tabBtnFlow" role="tab" aria-selected="true" aria-controls="vizViewFlow" class="px-2.5 py-1 rounded-md font-semibold transition bg-indigo-600 text-white">공격 흐름</button>
+                <button type="button" id="tabBtnTopology" role="tab" aria-selected="false" aria-controls="vizViewTopology" class="px-2.5 py-1 rounded-md font-semibold transition text-slate-400 hover:text-slate-200">네트워크 구성도</button>
+                <button type="button" id="tabBtnOsi" role="tab" aria-selected="false" aria-controls="vizViewOsi" class="px-2.5 py-1 rounded-md font-semibold transition text-slate-400 hover:text-slate-200">OSI 7계층</button>
               </div>
             </div>
 
-            <div class="text-xs">
-              <label class="block text-slate-400 mb-1">관찰된 사실 (Observation / Fact)</label>
-              <textarea id="triageObservation" rows="2" placeholder="예: 172.28.0.100에서 /login?id=' OR 1=1-- 요청 후 HTTP 200 응답 확인"
-                class="w-full bg-slate-800 border border-slate-700 rounded p-2 text-white focus:outline-none focus:border-sky-500"></textarea>
+            <div id="vizEmptyState" class="hidden text-center py-6 text-slate-500 text-xs">
+              표시할 공격 데이터가 없습니다.
             </div>
 
-            <div class="text-xs">
-              <label class="block text-slate-400 mb-1">분석가 추정 (Assessment)</label>
-              <textarea id="triageAssessment" rows="2" placeholder="예: 인증 우회 시도가 성공했을 가능성이 높으며 추가 DB 접근 로그 확인 필요"
-                class="w-full bg-slate-800 border border-slate-700 rounded p-2 text-white focus:outline-none focus:border-sky-500"></textarea>
-            </div>
-
-            <button id="btnSaveTriage" class="w-full bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold py-2 rounded-lg transition">
-              트리아지 결과 저장
-            </button>
-          </div>
-
-          <!-- 3. 대응 플레이북 (공식 actions.linux / actions.ufw 구조 · 복사 전용) -->
-          <div class="space-y-2">
-            <div class="flex items-center justify-between">
-              <h4 id="playbookTitle" class="text-xs font-bold uppercase tracking-wider text-amber-400">대응 플레이북 (CLI 안내용)</h4>
-              <span class="text-[11px] text-slate-500">자동 실행 안 함 · 복사 후 수동 적용</span>
-            </div>
-            <div id="playbookEvidenceNote" class="hidden text-[11px] bg-amber-500/10 border border-amber-500/30 text-amber-200 rounded-lg p-2"></div>
-            <div id="playbookContainer" class="space-y-2 text-xs">
-              <!-- JS로 치환된 명령어와 복사 버튼 렌더링 -->
-            </div>
-          </div>
-
-          <!-- 3-1. 분석 명령 안내 영역 (안내 전용 / 실행 버튼 없음) -->
-          <div id="analysisPanel" class="space-y-2 hidden">
-            <div class="flex items-center justify-between">
-              <h4 class="text-xs font-bold uppercase tracking-wider text-teal-400">분석 명령 안내</h4>
-              <span class="text-[11px] text-slate-500">조사 가이드 · 복사 후 터미널 수동 실행</span>
-            </div>
-            <div id="analysisContainer" class="space-y-3 text-xs">
-              <!-- createElement 및 textContent로 동적 생성 -->
-            </div>
-          </div>
-        </div>
-
-        <!-- 4. 시각화 (공격 스토리 & 공격 경로) 패널 -->
-        <div id="vizSection" class="border-t border-slate-800 pt-5 space-y-4">
-          <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2">
-            <div>
-              <h4 class="text-xs font-bold uppercase tracking-wider text-indigo-400">시각화 분석</h4>
-              <span class="text-[11px] text-slate-500">공격 흐름 · 토폴로지 구성도 · 계층 뷰</span>
-            </div>
-            <!-- 보기 전환 세그먼트 버튼 3개 -->
-            <div role="tablist" aria-label="시각화 보기 전환" class="flex items-center bg-slate-950 p-1 rounded-lg border border-slate-800 text-xs">
-              <button type="button" id="tabBtnFlow" role="tab" aria-selected="true" aria-controls="vizViewFlow" class="px-2.5 py-1 rounded-md font-semibold transition bg-indigo-600 text-white">공격 흐름</button>
-              <button type="button" id="tabBtnTopology" role="tab" aria-selected="false" aria-controls="vizViewTopology" class="px-2.5 py-1 rounded-md font-semibold transition text-slate-400 hover:text-slate-200">네트워크 구성도</button>
-              <button type="button" id="tabBtnOsi" role="tab" aria-selected="false" aria-controls="vizViewOsi" class="px-2.5 py-1 rounded-md font-semibold transition text-slate-400 hover:text-slate-200">OSI 7계층</button>
-            </div>
-          </div>
-
-          <div id="vizEmptyState" class="hidden text-center py-6 text-slate-500 text-xs">
-            표시할 공격 데이터가 없습니다.
-          </div>
-
-          <div id="vizContent">
-            <!-- 1. 공격 흐름 보기 (기본값, 기존 타임라인+경로) -->
-            <div id="vizViewFlow" role="tabpanel" aria-labelledby="tabBtnFlow" class="space-y-4">
-              <!-- 공격 경로 SVG 토폴로지 -->
-              <div class="bg-slate-950 border border-slate-800 rounded-lg p-3 space-y-2">
-                <div class="flex items-center justify-between">
-                  <span class="text-xs font-semibold text-slate-300">공격 경로 토폴로지</span>
-                  <span class="text-[11px] text-slate-500">Suricata(관찰자) · 실시간 집계</span>
-                </div>
-                <div id="pathSvgContainer" class="w-full overflow-x-auto flex justify-center py-1">
-                  <!-- renderPath()에서 createElementNS로 안전하게 생성 -->
-                </div>
-              </div>
-
-              <!-- 공격 타임라인 스토리 -->
-              <div class="bg-slate-950 border border-slate-800 rounded-lg p-3 space-y-2">
-                <div class="flex items-center justify-between">
-                  <span class="text-xs font-semibold text-slate-300">공격 진행 타임라인</span>
-                  <span class="text-[11px] text-slate-500">MITRE ATT&amp;CK 전술 단계</span>
-                </div>
-                <div id="storyContainer" class="space-y-2 text-xs max-h-72 overflow-y-auto pr-1">
-                  <!-- renderStory()에서 안전하게 생성 -->
-                </div>
-              </div>
-            </div>
-
-            <!-- 2. 네트워크 구성도 (토폴로지) 보기 -->
-            <div id="vizViewTopology" role="tabpanel" aria-labelledby="tabBtnTopology" class="hidden space-y-2">
-              <div class="bg-slate-950 border border-slate-800 rounded-lg p-3 space-y-2">
-                <div class="flex items-center justify-between">
-                  <div>
-                    <span class="text-xs font-semibold text-slate-300">실습망 네트워크 구성도</span>
-                    <span class="text-[11px] text-slate-400 block sm:inline sm:ml-2">br-minisiem (172.28.0.0/24)</span>
+            <div id="vizContent">
+              <!-- 1. 공격 흐름 보기 (기본값, 기존 타임라인+경로) -->
+              <div id="vizViewFlow" role="tabpanel" aria-labelledby="tabBtnFlow" class="space-y-4">
+                <!-- 공격 경로 SVG 토폴로지 -->
+                <div class="bg-slate-950 border border-slate-800 rounded-lg p-3 space-y-2">
+                  <div class="flex items-center justify-between">
+                    <span class="text-xs font-semibold text-slate-300">공격 경로 토폴로지</span>
+                    <span class="text-[11px] text-slate-500">Suricata(관찰자) · 실시간 집계</span>
                   </div>
-                  <span class="text-[11px] text-slate-500">신호 흐름 · C2 방향 미정 점멸</span>
+                  <div id="pathSvgContainer" class="w-full overflow-x-auto flex justify-center py-1">
+                    <!-- renderPath()에서 createElementNS로 안전하게 생성 -->
+                  </div>
                 </div>
-                <div id="topologySvgContainer" class="w-full overflow-x-auto flex justify-center py-1">
-                  <!-- renderTopology()에서 createElementNS로 안전하게 생성 -->
+
+                <!-- 공격 타임라인 스토리 -->
+                <div class="bg-slate-950 border border-slate-800 rounded-lg p-3 space-y-2">
+                  <div class="flex items-center justify-between">
+                    <span class="text-xs font-semibold text-slate-300">공격 진행 타임라인</span>
+                    <span class="text-[11px] text-slate-500">MITRE ATT&amp;CK 전술 단계</span>
+                  </div>
+                  <div id="storyContainer" class="space-y-2 text-xs max-h-72 overflow-y-auto pr-1">
+                    <!-- renderStory()에서 안전하게 생성 -->
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <!-- 3. OSI 7계층 (계층 보기) -->
-            <div id="vizViewOsi" role="tabpanel" aria-labelledby="tabBtnOsi" class="hidden space-y-2">
-              <div class="bg-slate-950 border border-slate-800 rounded-lg p-3 space-y-3">
-                <div class="flex items-center justify-between">
-                  <span class="text-xs font-semibold text-slate-300">OSI 7계층 공격 분포</span>
-                  <span class="text-[11px] text-slate-500">초당 3회 미만 안전 깜빡임 (1.2~1.5s)</span>
+              <!-- 2. 네트워크 구성도 (토폴로지) 보기 -->
+              <div id="vizViewTopology" role="tabpanel" aria-labelledby="tabBtnTopology" class="hidden space-y-2">
+                <div class="bg-slate-950 border border-slate-800 rounded-lg p-3 space-y-2">
+                  <div class="flex items-center justify-between">
+                    <div>
+                      <span class="text-xs font-semibold text-slate-300">실습망 네트워크 구성도</span>
+                      <span class="text-[11px] text-slate-400 block sm:inline sm:ml-2">br-minisiem (172.28.0.0/24)</span>
+                    </div>
+                    <span class="text-[11px] text-slate-500">신호 흐름 · C2 방향 미정 점멸</span>
+                  </div>
+                  <div id="topologySvgContainer" class="w-full overflow-x-auto flex justify-center py-1">
+                    <!-- renderTopology()에서 createElementNS로 안전하게 생성 -->
+                  </div>
                 </div>
-                <div id="osiLayersContainer" class="space-y-2 text-xs">
-                  <!-- renderOsiLayers()에서 DOM 요소로 안전하게 생성 -->
+              </div>
+
+              <!-- 3. OSI 7계층 (계층 보기) -->
+              <div id="vizViewOsi" role="tabpanel" aria-labelledby="tabBtnOsi" class="hidden space-y-2">
+                <div class="bg-slate-950 border border-slate-800 rounded-lg p-3 space-y-3">
+                  <div class="flex items-center justify-between">
+                    <span class="text-xs font-semibold text-slate-300">OSI 7계층 공격 분포</span>
+                    <span class="text-[11px] text-slate-500">초당 3회 미만 안전 깜빡임 (1.2~1.5s)</span>
+                  </div>
+                  <div id="osiLayersContainer" class="space-y-2 text-xs">
+                    <!-- renderOsiLayers()에서 DOM 요소로 안전하게 생성 -->
+                  </div>
                 </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
 
-    </section>
+      </section>
+    </div> <!-- // viewSoc 끝 -->
+
+    <!-- [탭 2] 분석 통계 (Analytics) 영역 -->
+    <div id="viewAnalytics" role="tabpanel" aria-labelledby="mainTabAnalytics" class="hidden space-y-6">
+
+      <!-- [4순위] 종합 그래프 (Executive Summary) -->
+      <section class="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-3">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 class="text-sm font-bold text-slate-100">종합 위협 및 관제 현황 (Executive Summary)</h2>
+            <p class="text-xs text-slate-400">카테고리별 전체 탐지 · 고위험(SEV1~2) 건수 대비 트리아지 검토율(%)</p>
+          </div>
+          <span class="text-[11px] text-amber-400 font-semibold">고위험↑ &amp; 검토율↓ 영역 우선 트리아지 권고</span>
+        </div>
+        <div class="h-64">
+          <canvas id="summaryComboChart"></canvas>
+        </div>
+      </section>
+
+      <!-- [1순위] 시간대별 타임라인 + [2순위] 룰별 정탐/오탐 비율 -->
+      <section class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <!-- 1순위: 시간대별 경보 타임라인 -->
+        <div class="lg:col-span-6 bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-3">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 class="text-sm font-bold text-slate-100">시간대별 경보 타임라인</h2>
+              <p class="text-xs text-slate-400">심각도(SEV1~4) 누적 분포 · UTC 기준</p>
+            </div>
+            <div class="flex items-center bg-slate-950 p-1 rounded-lg border border-slate-800 text-[11px]">
+              <button type="button" id="btnTimelineMin" class="px-2.5 py-1 rounded font-semibold bg-sky-600 text-white transition">분 단위</button>
+              <button type="button" id="btnTimelineHour" class="px-2.5 py-1 rounded font-semibold text-slate-400 hover:text-white transition">시간 단위</button>
+            </div>
+          </div>
+          <div class="h-64">
+            <canvas id="timelineChart"></canvas>
+          </div>
+        </div>
+
+        <!-- 2순위: 룰별(SID) 정탐 / 오탐 판정 비율 -->
+        <div class="lg:col-span-6 bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-3">
+          <div>
+            <h2 class="text-sm font-bold text-slate-100">룰별(SID) 정탐 / 오탐 판정 비율</h2>
+            <p class="text-xs text-slate-400">막대에 마우스를 올리면 검토 완료 기준 오탐률(FP Rate)이 표시됩니다.</p>
+          </div>
+          <div class="h-64">
+            <canvas id="ruleVerdictChart"></canvas>
+          </div>
+        </div>
+      </section>
+
+      <!-- [3순위] MITRE ATT&CK 커버리지 매트릭스 -->
+      <section class="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
+          <div>
+            <h2 class="text-sm font-bold text-slate-100">MITRE ATT&amp;CK 탐지 커버리지 및 사각지대(Gap)</h2>
+            <p class="text-xs text-slate-400">현재 Suricata 커스텀 룰(6종) 기준 탐지 가능 영역 vs 미지원 전술 영역</p>
+          </div>
+          <span id="mitreCoverageSummary" class="text-xs font-mono font-semibold text-sky-400"></span>
+        </div>
+        <div id="mitreCoverageGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <!-- renderMitreCoverage()에서 안전하게 렌더링 -->
+        </div>
+      </section>
+
+    </div> <!-- // viewAnalytics 끝 -->
   </main>
 
   <script>
@@ -867,7 +947,6 @@
         const res = await fetch(`${API_BASE}/api/alerts?limit=50`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
-        // 백엔드 공식 응답 키 { items, total, limit, offset } 우선 읽기
         alertsData = Array.isArray(data) ? data : (data.items || data.alerts || []);
 
         let stats = null;
@@ -878,7 +957,6 @@
           // stats 실패 시 프론트 집계로 폴백
         }
 
-        // 목록이 비었거나 선택했던 경보가 사라졌으면 상세 패널 비우기
         if (
           alertsData.length === 0 ||
           (selectedAlertId !== null && !alertsData.some(a => String(a.id) === String(selectedAlertId)))
@@ -906,6 +984,9 @@
       renderKPIAndChart(serverStats);
       renderAlertTable();
       renderCurrentViz();
+      if (currentMainView === "analytics") {
+        renderAnalyticsDashboard();
+      }
     }
 
     // 상단 KPI 및 6종(+미지 카테고리 포함) 차트 갱신
@@ -923,7 +1004,6 @@
       document.getElementById("kpiConfirmed").textContent = confirmed;
       document.getElementById("kpiUnreviewed").textContent = unreviewed;
 
-      // 6종 기본 집계 + 서버/목록에 있는 모르는 카테고리도 버리지 않고 추가
       const countsMap = {};
       BASE_CATEGORIES.forEach(c => { countsMap[c.key] = 0; });
 
@@ -949,7 +1029,6 @@
         colors.push(c.color);
       });
 
-      // 6종 외 미지 카테고리 추가
       Object.keys(countsMap).forEach(k => {
         if (!BASE_CATEGORIES.some(c => c.key === k) && countsMap[k] > 0) {
           labels.push(k.toUpperCase());
@@ -1089,7 +1168,6 @@
       document.getElementById("triageObservation").value = alert.observation || "";
       document.getElementById("triageAssessment").value = alert.assessment || "";
 
-      // 공식 플레이북 구조(name, preserve_evidence_first, actions.linux / actions.ufw) 렌더링
       const pb = alert.playbook || {};
       document.getElementById("playbookTitle").textContent = pb.name ? `대응 플레이북: ${pb.name}` : "대응 플레이북 (CLI 안내용)";
 
@@ -1104,7 +1182,6 @@
       const pbContainer = document.getElementById("playbookContainer");
       const groups = extractPlaybookGroups(alert);
 
-      // 플레이북 명령이 없어도 분석 패널은 먼저 그린다
       renderAnalysisPanel(alert);
 
       if (groups.length === 0) {
@@ -1161,7 +1238,6 @@
     // ==========================================
     // 5-V. 시각화 (공격 흐름, 네트워크 구성도, OSI 7계층)
     // ==========================================
-    // 카테고리 기반 MITRE 전술 라벨 반환
     function getTacticsLabel(category) {
       const cat = String(category || "").toLowerCase();
       if (cat === "portscan") return "정찰(Discovery)";
@@ -1172,18 +1248,16 @@
       return "기타";
     }
 
-    // 심각도 색상 코드 매핑 (SVG 및 UI 공용)
     function getSeverityHexColor(sev) {
       const map = {
-        SEV1: "#f43f5e", // rose-500
-        SEV2: "#f59e0b", // amber-500
-        SEV3: "#38bdf8", // sky-400
-        SEV4: "#94a3b8"  // slate-400
+        SEV1: "#f43f5e",
+        SEV2: "#f59e0b",
+        SEV3: "#38bdf8",
+        SEV4: "#94a3b8"
       };
       return map[sev] || "#94a3b8";
     }
 
-    // 타임라인 스토리 렌더링
     function renderStory(items) {
       const emptyStateEl = document.getElementById("vizEmptyState");
       const vizContentEl = document.getElementById("vizContent");
@@ -1200,14 +1274,12 @@
       if (vizContentEl) vizContentEl.classList.remove("hidden");
       if (!storyContainer) return;
 
-      // 시간순 정렬 (timestamp 기준 오름차순)
       const sorted = [...items].sort((a, b) => {
         const timeA = new Date(a.timestamp || 0).getTime();
         const timeB = new Date(b.timestamp || 0).getTime();
         return timeA - timeB;
       });
 
-      // 출발지 IP 다양성 검사 (서로 다른 출발지 IP가 2개 이상일 때만 그룹핑)
       const uniqueSrcs = new Set(sorted.map(a => a.src_ip || "unknown"));
       const isMultiSrc = uniqueSrcs.size >= 2;
 
@@ -1216,8 +1288,7 @@
       const createItemEl = (alert) => {
         const itemDiv = document.createElement("div");
         itemDiv.className = "flex items-start gap-2.5 p-2 rounded bg-slate-900 border border-slate-800 hover:border-slate-700 transition cursor-pointer";
-        
-        // 클릭 시 해당 경보 선택 및 상세/경로 강조 연동
+
         itemDiv.addEventListener("click", () => {
           selectedAlertId = alert.id;
           renderAlertTable();
@@ -1260,7 +1331,6 @@
         flowSpan.textContent = `${alert.src_ip || "-"} → ${alert.dest_ip || "-"}:${alert.dest_port ?? "-"}`;
         metaRow.appendChild(flowSpan);
 
-        // 성공 가능성: is_confirmed_risk와 severity가 SEV1인 경우만 표시
         if (alert.is_confirmed_risk && alert.severity === "SEV1") {
           const successBadge = document.createElement("span");
           successBadge.className = "px-1.5 py-0.2 rounded text-[10px] bg-rose-500/20 text-rose-300 border border-rose-500/40 font-sans";
@@ -1274,12 +1344,10 @@
       };
 
       if (!isMultiSrc) {
-        // 단일 출발지이거나 출발지가 1개인 경우: 단일 시간순 타임라인
         sorted.forEach(alert => {
           storyContainer.appendChild(createItemEl(alert));
         });
       } else {
-        // 서로 다른 출발지 IP가 2개 이상일 때: 출발지별 묶음 표시
         const groups = {};
         sorted.forEach(alert => {
           const src = alert.src_ip || "unknown";
@@ -1290,7 +1358,7 @@
         Object.keys(groups).forEach(src => {
           const groupHeader = document.createElement("div");
           groupHeader.className = "pt-2 pb-1 text-[11px] font-bold text-amber-400 border-b border-slate-800 flex items-center justify-between";
-          
+
           const headerTitle = document.createElement("span");
           headerTitle.textContent = `출발지 IP: ${src}`;
           groupHeader.appendChild(headerTitle);
@@ -1309,7 +1377,6 @@
       }
     }
 
-    // 공격 경로 SVG 그림 렌더링 (createElementNS와 textContent로 안전 생성)
     function renderPath(items, selected) {
       const container = document.getElementById("pathSvgContainer");
       if (!container) return;
@@ -1319,8 +1386,6 @@
         return;
       }
 
-      // 출발지 -> 목적지(dest_ip:dest_port) 링크 집계
-      // c2_beacon과 다른 공격이 같은 경로에 있으면 선을 분리한다.
       const linksMap = new Map();
       items.forEach(a => {
         const src = a.src_ip || "unknown";
@@ -1364,7 +1429,6 @@
       svg.setAttribute("viewBox", `0 0 ${svgWidth} ${svgHeight}`);
       svg.setAttribute("class", "overflow-visible select-none text-xs");
 
-      // Defs (화살표 마커 생성)
       const defs = document.createElementNS(svgNS, "defs");
       const severities = ["SEV1", "SEV2", "SEV3", "SEV4"];
       severities.forEach(sev => {
@@ -1384,7 +1448,6 @@
       });
       svg.appendChild(defs);
 
-      // 위치 좌표 매핑
       const srcCoords = new Map();
       const dstCoords = new Map();
 
@@ -1465,20 +1528,17 @@
         svg.appendChild(g);
       };
 
-      // 1. 링크 (선) 그리기: c2와 그 외 공격을 분리
       links.forEach(bucket => {
         const hasBoth = bucket.c2Alerts.length > 0 && bucket.otherAlerts.length > 0;
         drawPathLink(bucket.src, bucket.dst, bucket.c2Alerts, true, hasBoth ? -8 : 0);
         drawPathLink(bucket.src, bucket.dst, bucket.otherAlerts, false, hasBoth ? 8 : 0);
       });
 
-      // 2. Suricata 관찰자 노드 (공격자와 목적지 사이 통과 지점이 아니라 점선으로 연결된 옆의 관찰자 노드)
       const suricataX = svgWidth / 2;
       const suricataY = svgHeight - 24;
 
       const suriGroup = document.createElementNS(svgNS, "g");
 
-      // 관찰자 점선 (중앙 선과 연결)
       const suriLine = document.createElementNS(svgNS, "line");
       suriLine.setAttribute("x1", String(suricataX));
       suriLine.setAttribute("y1", String(svgHeight / 2));
@@ -1489,7 +1549,6 @@
       suriLine.setAttribute("stroke-width", "1.5");
       suriGroup.appendChild(suriLine);
 
-      // 관찰자 배지
       const suriRect = document.createElementNS(svgNS, "rect");
       suriRect.setAttribute("x", String(suricataX - 60));
       suriRect.setAttribute("y", String(suricataY - 14));
@@ -1513,7 +1572,6 @@
 
       svg.appendChild(suriGroup);
 
-      // 3. 출발지 노드 그리기
       uniqueSrcs.forEach(src => {
         const coord = srcCoords.get(src);
         const isHighlight = selected && selected.src_ip === src;
@@ -1551,7 +1609,6 @@
         svg.appendChild(g);
       });
 
-      // 4. 목적지 노드 그리기
       uniqueDsts.forEach(dst => {
         const coord = dstCoords.get(dst);
         const isHighlight = selected && `${selected.dest_ip || "unknown"}:${selected.dest_port ?? "unknown"}` === dst;
@@ -1595,8 +1652,6 @@
     // ==========================================
     // 5-B. 네트워크 구성도 (토폴로지) SVG 렌더링
     // ==========================================
-    // compose에 명시된 호스트 매핑: attacker=172.28.0.100, victim-web=172.28.0.10, victim-pc=172.28.0.11
-    // 이외 IP는 이름 없이 IP만 표시
     function getKnownHostName(ip) {
       if (ip === "172.28.0.100") return "attacker";
       if (ip === "172.28.0.10") return "victim-web";
@@ -1620,7 +1675,6 @@
       svg.setAttribute("viewBox", `0 0 ${svgWidth} ${svgHeight}`);
       svg.setAttribute("class", "overflow-visible select-none text-xs");
 
-      // Defs (화살표 마커)
       const defs = document.createElementNS(svgNS, "defs");
       const severities = ["SEV1", "SEV2", "SEV3", "SEV4"];
       severities.forEach(sev => {
@@ -1640,39 +1694,32 @@
       });
       svg.appendChild(defs);
 
-      // 데이터에 나타난 모든 출발지 및 목적지 호스트 IP 수집 (순서 보장)
       const hostIps = [];
       const addHost = (ip) => {
         if (!ip || ip === "unknown") return;
         if (!hostIps.includes(ip)) hostIps.push(ip);
       };
 
-      // 우선 공격자 및 피해자 순서가 자연스럽게 배치되도록
       items.forEach(a => {
         addHost(a.src_ip);
         addHost(a.dest_ip);
       });
 
-      // 중심 브리지/스위치 노드 위치
       const bridgeX = 250;
       const bridgeY = 175;
 
-      // 호스트들을 브리지 주변에 원형/타원형으로 배치
       const hostCoords = new Map();
       const n = hostIps.length;
       const radiusX = 175;
       const radiusY = 110;
 
       hostIps.forEach((ip, idx) => {
-        // -PI/2 (상단)부터 시계 방향 또는 분포
-        // 호스트가 적거나 많아도 균등 분할 배치
         const angle = -Math.PI / 2 + (2 * Math.PI * idx) / Math.max(n, 1);
         const x = Math.round(bridgeX + radiusX * Math.cos(angle));
         const y = Math.round(bridgeY + radiusY * Math.sin(angle));
         hostCoords.set(ip, { x, y });
       });
 
-      // 호스트와 브리지 간의 기본 연결선 (실습망 연결)
       hostIps.forEach(ip => {
         const coord = hostCoords.get(ip);
         if (!coord) return;
@@ -1687,8 +1734,6 @@
         svg.appendChild(line);
       });
 
-      // Suricata 관찰자 노드 (브리지에 점선으로 연결된 관찰자 노드)
-      // 하단 중앙 (bridge 바로 아래)
       const suriX = bridgeX;
       const suriY = bridgeY + 80;
 
@@ -1725,10 +1770,6 @@
       suriGroup.appendChild(suriText);
       svg.appendChild(suriGroup);
 
-      // 공격 경로 선 집계 및 분리
-      // 같은 src_ip, dest_ip에 대해:
-      // c2_beacon이 있으면 별도의 선으로 분리 (방향 없이 점멸 + '방향 미정' 라벨)
-      // 나머지 공격은 기존처럼 심각도 색상 + 화살표 + stroke-dashoffset 신호 흐름 애니메이션
       const pairAttackMap = new Map();
 
       items.forEach(a => {
@@ -1762,11 +1803,9 @@
         return highest;
       };
 
-      // 곡선(Q 커브) 생성을 위한 헬퍼
       const renderCurveLine = (start, end, offset, isC2, highestSev, count, isSelectedAlertOnLine) => {
         const g = document.createElementNS(svgNS, "g");
 
-        // 중점 및 법선 벡터로 곡률 부여
         const midX = (start.x + end.x) / 2;
         const midY = (start.y + end.y) / 2;
         const dx = end.x - start.x;
@@ -1787,18 +1826,14 @@
         pathEl.setAttribute("stroke-width", isSelectedAlertOnLine ? "3.5" : "2");
 
         if (isC2) {
-          // c2만 방향 없이 점멸과 '방향 미정' 라벨
           pathEl.setAttribute("class", "c2-blink-line");
         } else {
-          // 나머지 공격 선은 기존처럼 화살표와 흐름 애니메이션(stroke-dashoffset)
           pathEl.setAttribute("class", "flow-line");
           pathEl.setAttribute("marker-end", `url(#topo-arrow-${highestSev})`);
         }
 
         g.appendChild(pathEl);
 
-        // 라벨 위치 (곡선 중앙)
-        // 베지에 곡선 t=0.5 지점: B(0.5) = 0.25*P0 + 0.5*P1 + 0.25*P2
         const labelX = Math.round(0.25 * start.x + 0.5 * ctrlX + 0.25 * end.x);
         const labelY = Math.round(0.25 * start.y + 0.5 * ctrlY + 0.25 * end.y);
 
@@ -1836,7 +1871,6 @@
 
         const hasBoth = bucket.c2Alerts.length > 0 && bucket.otherAlerts.length > 0;
 
-        // C2 선 그리기
         if (bucket.c2Alerts.length > 0) {
           const c2Sev = getHighestSev(bucket.c2Alerts);
           const isSelected = selected && bucket.c2Alerts.some(a => String(a.id) === String(selected.id));
@@ -1844,7 +1878,6 @@
           renderCurveLine(start, end, offset, true, c2Sev, bucket.c2Alerts.length, isSelected);
         }
 
-        // 일반 공격 선 그리기
         if (bucket.otherAlerts.length > 0) {
           const otherSev = getHighestSev(bucket.otherAlerts);
           const isSelected = selected && bucket.otherAlerts.some(a => String(a.id) === String(selected.id));
@@ -1853,7 +1886,6 @@
         }
       });
 
-      // 중심 스위치/브리지 노드 (br-minisiem, 172.28.0.0/24)
       const bridgeGroup = document.createElementNS(svgNS, "g");
       const bridgeRect = document.createElementNS(svgNS, "rect");
       bridgeRect.setAttribute("x", String(bridgeX - 65));
@@ -1888,7 +1920,6 @@
 
       svg.appendChild(bridgeGroup);
 
-      // 주변 호스트 노드 렌더링
       hostIps.forEach(ip => {
         const coord = hostCoords.get(ip);
         if (!coord) return;
@@ -1915,7 +1946,6 @@
         icon.textContent = hostName === "attacker" ? "👾" : "💻";
         g.appendChild(icon);
 
-        // 호스트 이름이 있으면 표시, 없으면 IP만 표시
         if (hostName) {
           const nameText = document.createElementNS(svgNS, "text");
           nameText.setAttribute("x", String(coord.x));
@@ -1937,7 +1967,6 @@
           ipText.textContent = ip;
           g.appendChild(ipText);
         } else {
-          // 이름 없이 IP만 표시
           const ipText = document.createElementNS(svgNS, "text");
           ipText.setAttribute("x", String(coord.x));
           ipText.setAttribute("y", String(coord.y + 30));
@@ -1959,8 +1988,6 @@
     // ==========================================
     // 5-C. OSI 7계층 공격 분포 뷰 렌더링
     // ==========================================
-    // L7 응용 ~ L1 물리 막대 7개 + 공격 수 및 종류 칩
-    // 매핑: portscan/c2_beacon -> L3/L4, sqli/xss/ssrf -> L7, bruteforce -> L7 & L4, 미지 -> '미분류'
     function renderOsiLayers(items, selected) {
       const container = document.getElementById("osiLayersContainer");
       if (!container) return;
@@ -1968,7 +1995,6 @@
 
       if (!items || items.length === 0) return;
 
-      // 7계층 정의 (L7 ~ L1) 및 비전공자용 한 줄 설명
       const layers = [
         { id: "L7", num: 7, name: "응용 (Application)", desc: "웹·이메일·API 등 사용자가 직접 접하는 서비스 계층", cats: new Set(), alerts: [] },
         { id: "L6", num: 6, name: "표현 (Presentation)", desc: "데이터 인코딩·암호화 및 포맷 변환 계층", cats: new Set(), alerts: [] },
@@ -1979,30 +2005,26 @@
         { id: "L1", num: 1, name: "물리 (Physical)", desc: "전기 신호 및 네트워크 케이블 하드웨어 계층", cats: new Set(), alerts: [] }
       ];
 
-      // 미분류 전용 버킷
       const unclassified = { id: "UNCLASSIFIED", name: "미분류 계층", desc: "분석되지 않았거나 정의되지 않은 공격 카테고리", cats: new Set(), alerts: [] };
 
-      // 경보를 계층에 매핑
       items.forEach(alert => {
         const cat = String(alert.category || "").toLowerCase();
         let matched = false;
 
         if (cat === "sqli" || cat === "xss" || cat === "ssrf") {
-          layers[0].alerts.push(alert); // L7
+          layers[0].alerts.push(alert);
           layers[0].cats.add(cat.toUpperCase());
           matched = true;
         } else if (cat === "portscan" || cat === "c2_beacon") {
-          // L3 / L4 둘 다
-          layers[3].alerts.push(alert); // L4
+          layers[3].alerts.push(alert);
           layers[3].cats.add(cat.toUpperCase());
-          layers[4].alerts.push(alert); // L3
+          layers[4].alerts.push(alert);
           layers[4].cats.add(cat.toUpperCase());
           matched = true;
         } else if (cat === "bruteforce") {
-          // bruteforce: L7(SSH)과 L4(연결 횟수 탐지) 둘 다
-          layers[0].alerts.push(alert); // L7
+          layers[0].alerts.push(alert);
           layers[0].cats.add("BRUTEFORCE(SSH)");
-          layers[3].alerts.push(alert); // L4
+          layers[3].alerts.push(alert);
           layers[3].cats.add("BRUTEFORCE(L4탐지)");
           matched = true;
         }
@@ -2018,7 +2040,6 @@
         allBuckets.push(unclassified);
       }
 
-      // 최고 심각도 판별 함수
       const getHighestSev = (alertList) => {
         const sevOrder = { SEV1: 1, SEV2: 2, SEV3: 3, SEV4: 4 };
         let highest = "SEV4";
@@ -2042,7 +2063,6 @@
         let baseClass = "p-3 rounded-lg border transition space-y-2 ";
 
         if (isSelectedLayer) {
-          // 선택한 경보가 속한 계층은 더 뚜렷하게 (밝은 테두리 및 그림자)
           baseClass += "border-sky-400 bg-slate-900/90 ring-1 ring-sky-400/50 shadow-md shadow-sky-950 ";
         } else if (hasAttack) {
           baseClass += "border-slate-700 bg-slate-900/60 ";
@@ -2051,13 +2071,11 @@
         }
 
         if (hasAttack) {
-          // 공격이 있는 계층은 CSS @keyframes로 심각도 색이 깜빡임(1.4s 주기, 초당 3회 미만)
           baseClass += "layer-pulse ";
         }
 
         card.className = baseClass;
 
-        // 상단 행: 계층 이름 + 비전공자용 한 줄 설명 + 공격 건수
         const header = document.createElement("div");
         header.className = "flex flex-wrap items-center justify-between gap-1";
 
@@ -2083,7 +2101,6 @@
 
         header.appendChild(titleDiv);
 
-        // 건수 표시 (색뿐 아니라 숫자와 라벨 함께 표시)
         const countBadge = document.createElement("span");
         countBadge.className = "text-[11px] font-bold";
         if (hasAttack) {
@@ -2096,13 +2113,11 @@
         header.appendChild(countBadge);
         card.appendChild(header);
 
-        // 비전공자용 설명
         const descDiv = document.createElement("div");
         descDiv.className = "text-[11px] text-slate-400 leading-relaxed";
         descDiv.textContent = layer.desc;
         card.appendChild(descDiv);
 
-        // 공격 종류 칩 표시 (공격이 있는 경우)
         if (hasAttack) {
           const chipsDiv = document.createElement("div");
           chipsDiv.className = "flex flex-wrap gap-1.5 pt-1 border-t border-slate-800/80";
@@ -2163,7 +2178,6 @@
       const activeClass = "px-2.5 py-1 rounded-md font-semibold transition bg-indigo-600 text-white";
       const inactiveClass = "px-2.5 py-1 rounded-md font-semibold transition text-slate-400 hover:text-slate-200";
 
-      // 버튼 접근성 및 스타일 갱신
       if (flowBtn) {
         flowBtn.className = tab === "flow" ? activeClass : inactiveClass;
         flowBtn.setAttribute("aria-selected", tab === "flow" ? "true" : "false");
@@ -2177,7 +2191,6 @@
         osiBtn.setAttribute("aria-selected", tab === "osi" ? "true" : "false");
       }
 
-      // 뷰 표시 토글
       if (flowView) flowView.classList.toggle("hidden", tab !== "flow");
       if (topoView) topoView.classList.toggle("hidden", tab !== "topology");
       if (osiView) osiView.classList.toggle("hidden", tab !== "osi");
@@ -2226,7 +2239,6 @@
       }
     });
 
-    // PCAP 파일 업로드 (POST /api/pcap/upload, 서버 에러 본문 표시)
     document.getElementById("pcapFileInput").addEventListener("change", async (e) => {
       const file = e.target.files[0];
       if (!file) return;
@@ -2259,7 +2271,6 @@
       }
     });
 
-    // Mock / Live 모드 전환 시 이전 상세 패널 비우기
     document.getElementById("btnMockMode").addEventListener("click", () => {
       isLiveMode = false;
       clearDetailPanel();
@@ -2350,6 +2361,357 @@
     document.getElementById("tabBtnFlow").addEventListener("click", () => switchVizTab("flow"));
     document.getElementById("tabBtnTopology").addEventListener("click", () => switchVizTab("topology"));
     document.getElementById("tabBtnOsi").addEventListener("click", () => switchVizTab("osi"));
+
+    // ==========================================
+    // 7. 분석 통계 모듈 (1~4순위 통합 + 메인 탭 전환)
+    // ==========================================
+    let currentMainView = "soc"; // "soc" | "analytics"
+    let timelineChartInstance = null;
+    let timelineGranularity = "minute"; // "minute" | "hour"
+    let ruleVerdictChartInstance = null;
+    let summaryComboChartInstance = null;
+
+    // --- [1순위] 시간대별 경보 타임라인 ---
+    function calcAlertTimeline(items, granularity = "minute") {
+      const buckets = new Map();
+      const sorted = [...(items || [])].sort(
+        (a, b) => new Date(a.timestamp || 0) - new Date(b.timestamp || 0)
+      );
+      sorted.forEach(alert => {
+        if (!alert.timestamp) return;
+        const timePart = String(alert.timestamp).slice(11, 16);
+        const key = granularity === "hour" ? `${timePart.slice(0, 2)}:00` : timePart;
+        if (!buckets.has(key)) buckets.set(key, { SEV1: 0, SEV2: 0, SEV3: 0, SEV4: 0 });
+        const sev = ["SEV1", "SEV2", "SEV3", "SEV4"].includes(alert.severity) ? alert.severity : "SEV4";
+        buckets.get(key)[sev] += 1;
+      });
+      const labels = Array.from(buckets.keys());
+      return {
+        labels,
+        series: {
+          SEV1: labels.map(k => buckets.get(k).SEV1),
+          SEV2: labels.map(k => buckets.get(k).SEV2),
+          SEV3: labels.map(k => buckets.get(k).SEV3),
+          SEV4: labels.map(k => buckets.get(k).SEV4)
+        }
+      };
+    }
+
+    function renderTimelineChart(items) {
+      const canvas = document.getElementById("timelineChart");
+      if (!canvas) return;
+      const { labels, series } = calcAlertTimeline(items, timelineGranularity);
+      const datasets = ["SEV1", "SEV2", "SEV3", "SEV4"].map(sev => ({
+        label: sev,
+        data: series[sev],
+        backgroundColor: getSeverityHexColor(sev),
+        borderRadius: 3
+      }));
+      if (!timelineChartInstance) {
+        timelineChartInstance = new Chart(canvas.getContext("2d"), {
+          type: "bar",
+          data: { labels, datasets },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { position: "top", labels: { color: "#cbd5e1", boxWidth: 10, font: { size: 11 } } } },
+            scales: {
+              x: { stacked: true, ticks: { color: "#cbd5e1", font: { size: 10 } }, grid: { display: false } },
+              y: { stacked: true, beginAtZero: true, ticks: { stepSize: 1, color: "#94a3b8" }, grid: { color: "#1e293b" } }
+            }
+          }
+        });
+      } else {
+        timelineChartInstance.data.labels = labels;
+        timelineChartInstance.data.datasets = datasets;
+        timelineChartInstance.update("none");
+      }
+    }
+
+    // --- [2순위] 룰별(SID) 정탐/오탐 비율 ---
+    function calcRuleVerdictStats(items) {
+      const map = new Map();
+      (items || []).forEach(alert => {
+        const sid = alert.sid ?? "UNKNOWN";
+        const cat = String(alert.category || "unknown").toUpperCase();
+        const key = String(sid);
+        if (!map.has(key)) {
+          map.set(key, { sid: key, label: `${key} (${cat})`, TP: 0, FP: 0, UNREVIEWED: 0, total: 0 });
+        }
+        const row = map.get(key);
+        const verdict = ["TP", "FP", "UNREVIEWED"].includes(alert.verdict) ? alert.verdict : "UNREVIEWED";
+        row[verdict] += 1;
+        row.total += 1;
+      });
+      const rows = Array.from(map.values()).sort((a, b) => b.total - a.total);
+      return {
+        labels: rows.map(r => r.label),
+        tp: rows.map(r => r.TP),
+        fp: rows.map(r => r.FP),
+        unreviewed: rows.map(r => r.UNREVIEWED),
+        rows
+      };
+    }
+
+    function renderRuleVerdictChart(items) {
+      const canvas = document.getElementById("ruleVerdictChart");
+      if (!canvas) return;
+      const stats = calcRuleVerdictStats(items);
+      const datasets = [
+        { label: "정탐 (TP)", data: stats.tp, backgroundColor: "#f43f5e", borderRadius: 3 },
+        { label: "오탐 (FP)", data: stats.fp, backgroundColor: "#10b981", borderRadius: 3 },
+        { label: "미검토 (UNREVIEWED)", data: stats.unreviewed, backgroundColor: "#64748b", borderRadius: 3 }
+      ];
+      const fpTooltipCb = (tooltipItems) => {
+        const row = stats.rows[tooltipItems[0]?.dataIndex];
+        if (!row) return "";
+        const reviewed = row.TP + row.FP;
+        if (reviewed === 0) return "검토된 경보 없음 (오탐률 계산 불가)";
+        return `검토 기준 오탐률(FP Rate): ${((row.FP / reviewed) * 100).toFixed(1)}% (${row.FP}/${reviewed})`;
+      };
+      if (!ruleVerdictChartInstance) {
+        ruleVerdictChartInstance = new Chart(canvas.getContext("2d"), {
+          type: "bar",
+          data: { labels: stats.labels, datasets },
+          options: {
+            indexAxis: "y",
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { position: "top", labels: { color: "#cbd5e1", boxWidth: 10, font: { size: 11 } } },
+              tooltip: { callbacks: { afterBody: fpTooltipCb } }
+            },
+            scales: {
+              x: { stacked: true, beginAtZero: true, ticks: { stepSize: 1, color: "#94a3b8" }, grid: { color: "#1e293b" } },
+              y: { stacked: true, ticks: { color: "#cbd5e1", font: { size: 11 } }, grid: { display: false } }
+            }
+          }
+        });
+      } else {
+        ruleVerdictChartInstance.data.labels = stats.labels;
+        ruleVerdictChartInstance.data.datasets = datasets;
+        ruleVerdictChartInstance.options.plugins.tooltip.callbacks.afterBody = fpTooltipCb;
+        ruleVerdictChartInstance.update("none");
+      }
+    }
+
+    // --- [3순위] MITRE ATT&CK 커버리지 ---
+    const MITRE_TACTICS_CATALOG = [
+      { id: "TA0007", name: "정찰 (Discovery)", techniques: [{ id: "T1046", name: "Network Service Discovery", categories: ["portscan"] }] },
+      { id: "TA0001", name: "최초 침투 (Initial Access)", techniques: [
+        { id: "T1190", name: "Exploit Public-Facing App (SQLi/SSRF)", categories: ["sqli", "ssrf"] },
+        { id: "T1189", name: "Drive-by Compromise (XSS)", categories: ["xss"] }
+      ]},
+      { id: "TA0006", name: "인증 탈취 (Credential Access)", techniques: [{ id: "T1110.001", name: "Brute Force: Password Guessing", categories: ["bruteforce"] }] },
+      { id: "TA0011", name: "명령 및 제어 (C2)", techniques: [{ id: "T1071.001", name: "Application Layer Protocol", categories: ["c2_beacon"] }] },
+      { id: "TA0002", name: "실행 (Execution)", techniques: [] },
+      { id: "TA0004", name: "권한 상승 (Privilege Escalation)", techniques: [] },
+      { id: "TA0008", name: "내부 확산 (Lateral Movement)", techniques: [] },
+      { id: "TA0010", name: "데이터 유출 (Exfiltration)", techniques: [] }
+    ];
+
+    function calcMitreCoverage(items) {
+      const sevOrder = { SEV1: 1, SEV2: 2, SEV3: 3, SEV4: 4 };
+      const alertList = items || [];
+      let coveredTactics = 0, activeTechniques = 0, totalTechniques = 0;
+
+      const tactics = MITRE_TACTICS_CATALOG.map(tactic => {
+        const hasRules = tactic.techniques.length > 0;
+        if (hasRules) coveredTactics += 1;
+        const techniques = tactic.techniques.map(tech => {
+          totalTechniques += 1;
+          const matched = alertList.filter(a =>
+            tech.categories.includes(String(a.category || "").toLowerCase()) ||
+            String(a.mitre_id || "").toUpperCase() === tech.id
+          );
+          let highestSev = null;
+          if (matched.length > 0) {
+            activeTechniques += 1;
+            highestSev = matched.reduce((best, cur) =>
+              (sevOrder[cur.severity] || 4) < (sevOrder[best] || 4) ? cur.severity : best, "SEV4"
+            );
+          }
+          return { ...tech, count: matched.length, highestSev };
+        });
+        return { id: tactic.id, name: tactic.name, hasRules, techniques };
+      });
+
+      const totalTactics = MITRE_TACTICS_CATALOG.length;
+      return {
+        totalTactics,
+        coveredTactics,
+        coveragePct: totalTactics > 0 ? ((coveredTactics / totalTactics) * 100).toFixed(1) : "0.0",
+        totalTechniques,
+        activeTechniques,
+        tactics
+      };
+    }
+
+    function renderMitreCoverage(items) {
+      const summaryEl = document.getElementById("mitreCoverageSummary");
+      const gridEl = document.getElementById("mitreCoverageGrid");
+      if (!gridEl) return;
+      const data = calcMitreCoverage(items);
+
+      if (summaryEl) {
+        summaryEl.textContent = `전술 커버리지: ${data.coveredTactics}/${data.totalTactics} (${data.coveragePct}%) · 활성 탐지 기법: ${data.activeTechniques}/${data.totalTechniques}종`;
+      }
+      gridEl.textContent = "";
+
+      data.tactics.forEach(tactic => {
+        const card = document.createElement("div");
+        card.className = tactic.hasRules
+          ? "bg-slate-950 border border-slate-800 rounded-lg p-3 space-y-2"
+          : "bg-slate-950/40 border border-dashed border-slate-800 rounded-lg p-3 space-y-2 opacity-65";
+
+        const header = document.createElement("div");
+        header.className = "flex items-center justify-between border-b border-slate-800 pb-1.5";
+        const nameSpan = document.createElement("span");
+        nameSpan.className = "text-xs font-bold text-slate-200";
+        nameSpan.textContent = tactic.name;
+        const idSpan = document.createElement("span");
+        idSpan.className = "text-[10px] font-mono text-slate-500";
+        idSpan.textContent = tactic.id;
+        header.append(nameSpan, idSpan);
+        card.appendChild(header);
+
+        if (!tactic.hasRules) {
+          const gap = document.createElement("div");
+          gap.className = "text-[11px] text-slate-500 py-2 text-center";
+          gap.textContent = "탐지 룰 미지원 (보안 사각지대)";
+          card.appendChild(gap);
+        } else {
+          tactic.techniques.forEach(tech => {
+            const isDetected = tech.count > 0;
+            const row = document.createElement("div");
+            row.className = "p-2 rounded border text-[11px] space-y-1 " + (isDetected ? "bg-slate-900 border-slate-700" : "bg-slate-900/40 border-slate-800/80");
+
+            const top = document.createElement("div");
+            top.className = "flex items-center justify-between gap-1";
+            const techId = document.createElement("span");
+            techId.className = "font-mono font-bold text-sky-400";
+            techId.textContent = tech.id;
+
+            const badge = document.createElement("span");
+            badge.className = "px-1.5 py-0.5 rounded text-[10px] font-bold";
+            if (isDetected) {
+              const hex = getSeverityHexColor(tech.highestSev);
+              badge.style.backgroundColor = hex + "33";
+              badge.style.color = hex;
+              badge.textContent = `${tech.count}건 (${tech.highestSev})`;
+            } else {
+              badge.className += " bg-slate-800 text-slate-400";
+              badge.textContent = "룰 보유 (0건)";
+            }
+            top.append(techId, badge);
+
+            const techName = document.createElement("div");
+            techName.className = "text-slate-300 truncate";
+            techName.textContent = tech.name;
+            row.append(top, techName);
+            card.appendChild(row);
+          });
+        }
+        gridEl.appendChild(card);
+      });
+    }
+
+    // --- [4순위] 종합 그래프 (Executive Summary) ---
+    function calcExecutiveSummary(items) {
+      const alertList = items || [];
+      const rows = BASE_CATEGORIES.map(cat => {
+        const matched = alertList.filter(a => String(a.category || "").toLowerCase() === cat.key);
+        const total = matched.length;
+        const highRisk = matched.filter(a => a.severity === "SEV1" || a.severity === "SEV2").length;
+        const reviewed = matched.filter(a => a.verdict === "TP" || a.verdict === "FP").length;
+        return {
+          label: cat.label,
+          total,
+          highRisk,
+          reviewRate: total > 0 ? Number(((reviewed / total) * 100).toFixed(1)) : 0
+        };
+      });
+      return {
+        labels: rows.map(r => r.label),
+        totals: rows.map(r => r.total),
+        highRisks: rows.map(r => r.highRisk),
+        reviewRates: rows.map(r => r.reviewRate)
+      };
+    }
+
+    function renderSummaryComboChart(items) {
+      const canvas = document.getElementById("summaryComboChart");
+      if (!canvas) return;
+      const data = calcExecutiveSummary(items);
+      const datasets = [
+        { type: "bar", label: "전체 탐지 (건)", data: data.totals, backgroundColor: "rgba(56, 189, 248, 0.55)", borderColor: "#38bdf8", borderWidth: 1, borderRadius: 4, yAxisID: "y" },
+        { type: "bar", label: "고위험 SEV1~2 (건)", data: data.highRisks, backgroundColor: "rgba(244, 63, 94, 0.75)", borderColor: "#f43f5e", borderWidth: 1, borderRadius: 4, yAxisID: "y" },
+        { type: "line", label: "트리아지 검토율 (%)", data: data.reviewRates, borderColor: "#fbbf24", backgroundColor: "#fbbf24", borderWidth: 2, tension: 0.25, pointRadius: 4, yAxisID: "y1" }
+      ];
+      if (!summaryComboChartInstance) {
+        summaryComboChartInstance = new Chart(canvas.getContext("2d"), {
+          type: "bar",
+          data: { labels: data.labels, datasets },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: "index", intersect: false },
+            plugins: { legend: { position: "top", labels: { color: "#cbd5e1", boxWidth: 12, font: { size: 11 } } } },
+            scales: {
+              x: { ticks: { color: "#cbd5e1", font: { size: 11 } }, grid: { display: false } },
+              y: { type: "linear", position: "left", beginAtZero: true, title: { display: true, text: "탐지 건수", color: "#94a3b8", font: { size: 10 } }, ticks: { stepSize: 1, color: "#94a3b8" }, grid: { color: "#1e293b" } },
+              y1: { type: "linear", position: "right", min: 0, max: 100, title: { display: true, text: "검토율 (%)", color: "#fbbf24", font: { size: 10 } }, ticks: { color: "#fbbf24", callback: v => `${v}%` }, grid: { drawOnChartArea: false } }
+            }
+          }
+        });
+      } else {
+        summaryComboChartInstance.data.labels = data.labels;
+        summaryComboChartInstance.data.datasets = datasets;
+        summaryComboChartInstance.update("none");
+      }
+    }
+
+    // --- 통계 탭 전체 렌더링 & 화면 전환 ---
+    function renderAnalyticsDashboard() {
+      renderSummaryComboChart(alertsData);
+      renderTimelineChart(alertsData);
+      renderRuleVerdictChart(alertsData);
+      renderMitreCoverage(alertsData);
+    }
+
+    function switchMainView(view) {
+      currentMainView = view;
+      const isSoc = view === "soc";
+      const socBtn = document.getElementById("mainTabSoc");
+      const anaBtn = document.getElementById("mainTabAnalytics");
+      const activeCls = "px-4 py-2 rounded-lg text-xs font-bold bg-sky-600 text-white transition";
+      const inactiveCls = "px-4 py-2 rounded-lg text-xs font-bold bg-slate-900 text-slate-400 hover:text-white border border-slate-800 transition";
+
+      if (socBtn) { socBtn.className = isSoc ? activeCls : inactiveCls; socBtn.setAttribute("aria-selected", String(isSoc)); }
+      if (anaBtn) { anaBtn.className = !isSoc ? activeCls : inactiveCls; anaBtn.setAttribute("aria-selected", String(!isSoc)); }
+
+      document.getElementById("viewSoc")?.classList.toggle("hidden", !isSoc);
+      document.getElementById("viewAnalytics")?.classList.toggle("hidden", isSoc);
+
+      if (!isSoc) renderAnalyticsDashboard();
+    }
+
+    // 메인 탭 & 타임라인 단위 전환 이벤트 연결
+    document.getElementById("mainTabSoc")?.addEventListener("click", () => switchMainView("soc"));
+    document.getElementById("mainTabAnalytics")?.addEventListener("click", () => switchMainView("analytics"));
+
+    document.getElementById("btnTimelineMin")?.addEventListener("click", () => {
+      timelineGranularity = "minute";
+      document.getElementById("btnTimelineMin").className = "px-2.5 py-1 rounded font-semibold bg-sky-600 text-white transition";
+      document.getElementById("btnTimelineHour").className = "px-2.5 py-1 rounded font-semibold text-slate-400 hover:text-white transition";
+      renderTimelineChart(alertsData);
+    });
+    document.getElementById("btnTimelineHour")?.addEventListener("click", () => {
+      timelineGranularity = "hour";
+      document.getElementById("btnTimelineHour").className = "px-2.5 py-1 rounded font-semibold bg-sky-600 text-white transition";
+      document.getElementById("btnTimelineMin").className = "px-2.5 py-1 rounded font-semibold text-slate-400 hover:text-white transition";
+      renderTimelineChart(alertsData);
+    });
 
     // 초기 실행
     startPolling();
