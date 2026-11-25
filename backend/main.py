@@ -212,7 +212,43 @@ def load_rule_catalog() -> Optional[List[Dict[str, Any]]]:
 
 def build_alert_dict(row, playbooks: Dict[str, Any]) -> Dict[str, Any]:
     category = row["category"]
-    playbook_entry = playbooks.get(category) if category else None
+    raw_playbook = playbooks.get(category) if category else None
+    playbook_entry = None
+    if isinstance(raw_playbook, dict):
+        playbook_entry = dict(raw_playbook)
+        raw_analysis = playbook_entry.get("analysis")
+        normalized_analysis = []
+        if isinstance(raw_analysis, list):
+            for item in raw_analysis:
+                if not isinstance(item, dict):
+                    continue
+                cmd = item.get("command")
+                tokens = item.get("tokens")
+                if not isinstance(cmd, str) or not isinstance(tokens, list):
+                    continue
+                masked_cmd, _ = mask_text(cmd)
+                norm_tokens = []
+                for tok in tokens:
+                    if not isinstance(tok, dict):
+                        continue
+                    t_val = tok.get("token")
+                    d_val = tok.get("desc")
+                    masked_tok, _ = mask_text(t_val) if t_val is not None else ("", False)
+                    masked_desc, _ = mask_text(d_val) if d_val is not None else ("", False)
+                    norm_tokens.append({
+                        "token": masked_tok,
+                        "desc": masked_desc,
+                    })
+                masked_title, _ = mask_text(str(item.get("title", "") or ""))
+                masked_where, _ = mask_text(str(item.get("where", "") or ""))
+                normalized_analysis.append({
+                    "title": masked_title,
+                    "where": masked_where,
+                    "command": masked_cmd,
+                    "tokens": norm_tokens,
+                })
+        playbook_entry["analysis"] = normalized_analysis
+
     return {
         "id": row["id"],
         "timestamp": row["timestamp"],
@@ -236,7 +272,14 @@ def build_alert_dict(row, playbooks: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 def run_suricata(pcap, outdir, rules):
-    command = [os.getenv("SURICATA_BIN", "suricata"), "-r", str(pcap), "-S", str(rules), "-l", str(outdir), "-k", "none"]
+    command = [
+        os.getenv("SURICATA_BIN", "suricata"),
+        "-r", str(pcap),
+        "-S", str(rules),
+        "-l", str(outdir),
+        "-k", "none",
+        "--runmode", "single",
+    ]
     return subprocess.run(command, capture_output=True, text=True, timeout=int(os.getenv("SURICATA_TIMEOUT", "120")))
 
 @app.post("/api/pcap/upload", response_model=UploadResult)

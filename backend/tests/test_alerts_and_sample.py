@@ -342,3 +342,107 @@ def test_alert_without_playbook_returns_null(monkeypatch, tmp_path):
     detail = res_detail.json()
     assert detail["category"] == "c2_beacon"
     assert detail["playbook"] is None
+
+def test_alert_detail_playbook_analysis_normalization(monkeypatch, tmp_path):
+    c = make_client(monkeypatch, tmp_path)
+    c.post("/api/ingest/sample")
+
+    # 1. sqli has analysis: verify {{SRC_IP}} is untouched in backend response
+    res1 = c.get("/api/alerts/1")
+    assert res1.status_code == 200
+    data1 = res1.json()
+    assert data1["category"] == "sqli"
+    pb1 = data1["playbook"]
+    assert pb1 is not None
+    assert isinstance(pb1["analysis"], list)
+    assert len(pb1["analysis"]) == 1
+    analysis_entry = pb1["analysis"][0]
+    assert "{{SRC_IP}}" in analysis_entry["command"]
+    assert analysis_entry["command"] == "docker logs --since 5m victim-web | grep '{{SRC_IP}}'"
+    assert analysis_entry["where"] == "victim-web"
+    assert len(analysis_entry["tokens"]) == 2
+    assert analysis_entry["tokens"][0]["token"] == "victim-web"
+
+    # 2. portscan has no analysis in fixture -> normalized to []
+    res4 = c.get("/api/alerts/4")
+    assert res4.status_code == 200
+    data4 = res4.json()
+    assert data4["category"] == "portscan"
+    pb4 = data4["playbook"]
+    assert pb4 is not None
+    assert pb4["analysis"] == []
+
+    # 3. Invalid items (command non-string, tokens non-list) are filtered out, returns 200
+    custom_playbooks = {
+        "sqli": {
+            "verify": "true",
+            "analysis": [
+                {"title": "valid", "command": "echo 1", "tokens": [{"token": "1", "desc": "num"}]},
+                {"title": "bad_command", "command": 12345, "tokens": []},
+                {"title": "bad_tokens", "command": "echo 2", "tokens": "not_a_list"},
+                "not_a_dict_entry",
+            ]
+        }
+    }
+    pb_file = tmp_path / "custom_playbooks.json"
+    pb_file.write_text(json.dumps(custom_playbooks), encoding="utf-8")
+    monkeypatch.setenv("PLAYBOOKS_PATH", str(pb_file))
+
+    res_custom = c.get("/api/alerts/1")
+    assert res_custom.status_code == 200
+    pb_custom = res_custom.json()["playbook"]
+    assert len(pb_custom["analysis"]) == 1
+    assert pb_custom["analysis"][0]["title"] == "valid"
+
+    # 4. Masking password= and token= in command and tokens
+    mask_playbooks = {
+        "sqli": {
+            "verify": "true",
+            "analysis": [
+                {
+                    "title": "check password=secret123",
+                    "where": "host token=tok456",
+                    "command": "curl http://test?password=secret123&token=tok456",
+                    "tokens": [
+                        {"token": "password=secret123", "desc": "admin password=secret123"},
+                        {"token": "token=tok456", "desc": "secret token=tok456"}
+                    ]
+                }
+            ]
+        }
+    }
+    mask_file = tmp_path / "mask_playbooks.json"
+    mask_file.write_text(json.dumps(mask_playbooks), encoding="utf-8")
+    monkeypatch.setenv("PLAYBOOKS_PATH", str(mask_file))
+
+    res_mask = c.get("/api/alerts/1")
+    assert res_mask.status_code == 200
+    analysis_mask = res_mask.json()["playbook"]["analysis"][0]
+    assert "password=[MASKED]" in analysis_mask["command"]
+    assert "token=[MASKED]" in analysis_mask["command"]
+    assert "secret123" not in analysis_mask["command"]
+    assert "tok456" not in analysis_mask["command"]
+    assert analysis_mask["tokens"][0]["token"] == "password=[MASKED]"
+    assert "password=[MASKED]" in analysis_mask["tokens"][0]["desc"]
+    assert "secret123" not in analysis_mask["tokens"][0]["desc"]
+    assert analysis_mask["title"] == "check password=[MASKED]"
+    assert analysis_mask["where"] == "host token=[MASKED]"
+    assert "secret123" not in analysis_mask["title"]
+    assert "tok456" not in analysis_mask["where"]
+
+
+def test_alert_detail_analysis_non_list_becomes_empty(monkeypatch, tmp_path):
+    c = make_client(monkeypatch, tmp_path)
+    c.post("/api/ingest/sample")
+
+    for raw in ("not-a-list", {"title": "x", "command": "echo 1", "tokens": []}):
+        custom = {"sqli": {"verify": "true", "analysis": raw}}
+        pb_file = tmp_path / "nonlist_playbooks.json"
+        pb_file.write_text(json.dumps(custom), encoding="utf-8")
+        monkeypatch.setenv("PLAYBOOKS_PATH", str(pb_file))
+        res = c.get("/api/alerts/1")
+        assert res.status_code == 200
+        pb = res.json()["playbook"]
+        assert pb is not None
+        assert pb["analysis"] == []
+
