@@ -14,7 +14,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from threading import Thread
 from urllib.parse import parse_qs, urlparse
 from urllib.error import HTTPError, URLError
-from urllib.request import urlopen
+from urllib.request import HTTPRedirectHandler, build_opener
 
 DB_PATH = "/tmp/lab.db"
 LISTEN = ("0.0.0.0", 80)
@@ -22,6 +22,14 @@ LISTEN = ("0.0.0.0", 80)
 # 실습용 가짜 계정. 실제 비밀번호가 아닙니다.
 LAB_USER = "labuser"
 LAB_PASS = "labpass"
+
+
+class NoRedirectHandler(HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+FETCH_OPENER = build_opener(NoRedirectHandler)
 
 
 def init_db() -> None:
@@ -123,7 +131,7 @@ class LabHandler(BaseHTTPRequestHandler):
                 return
 
             try:
-                with urlopen(target, timeout=2) as response:
+                with FETCH_OPENER.open(target, timeout=2) as response:
                     body = response.read(4096).decode("utf-8", errors="replace")
                 self._send(200, body, "text/plain; charset=utf-8")
             except (HTTPError, URLError, TimeoutError, OSError):
