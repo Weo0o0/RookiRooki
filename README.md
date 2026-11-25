@@ -89,6 +89,8 @@ Backlog의 Stage 2 항목을 **선택 기능**으로 미리 구현해 둔 것입
 
 - 사용자가 자기 Ubuntu 터미널에서 `sudo suricata -i br-minisiem ...`로 브리지를 라이브 캡처하면, 백엔드가 `backend/data/live/eve.json`을 읽어 기존 파서로 저장합니다. 백엔드는 Suricata를 시작·중지하지 않고 `sudo`도 호출하지 않습니다(root 권한이 필요하므로 안내만 제공).
 - `src_ip`와 `dest_ip`가 모두 `172.28.0.0/24` 안인 경보만 저장합니다.
+- 이미 저장한 경보의 `http` 응답이 나중 배치에 도착하면 `http_status`·심각도(200이면 SEV1)만 갱신하며, 같은 줄을 다시 읽어도 중복 저장되지 않습니다.
+- 터미널은 Windows에서 PowerShell → `wsl -d Ubuntu` → `cd ~/RookiRooki` 순서로 엽니다. 백엔드 `uvicorn`은 `(서버_터미널.1)`(`.venv` 필요)에서 `--reload` 없이 프로세스 1개로 실행하고, 요청은 `(요청_터미널.3)`, 트래픽은 `(attacker_터미널.4)`, Suricata는 `(라이브_터미널.8)`(`.venv` 불필요)에서 실행합니다.
 - 시작·중지 명령, 터미널별 역할, offset·중복 규칙, 한계는 [docs/live_capture_guide.md](docs/live_capture_guide.md)를 참고하세요.
 
 ## 저장소 구조

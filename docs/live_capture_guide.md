@@ -25,6 +25,22 @@ Suricata(라이브, br-minisiem) → backend/data/live/eve.json → 백엔드 �
 
 터미널 번호는 [설치_테스트_가이드](설치_테스트_가이드.md)의 표를 따르며, 이 기능에서만 `라이브_터미널.8`(Ubuntu)을 새로 씁니다.
 
+| 번호 | 이름 | 역할 | `.venv` 필요 여부 |
+|---:|---|---|---|
+| 1 | `서버_터미널.1` | 백엔드 `uvicorn`(`:8000`) 실행 | 필요 |
+| 3 | `요청_터미널.3` | `curl`로 상태·경보 확인 | 불필요 |
+| 4 | `attacker_터미널.4` | 실습망 `docker compose`, `lab-traffic.sh` 실행 | 불필요 |
+| 8 | `라이브_터미널.8` | Suricata 라이브 캡처 (`sudo`) | 불필요 |
+
+새 Ubuntu 창은 Windows에서 **PowerShell 새 창 → `wsl -d Ubuntu` → `cd ~/RookiRooki`** 순서로 엽니다.
+
+```powershell
+wsl -d Ubuntu
+```
+```bash
+cd ~/RookiRooki
+```
+
 1. `(attacker_터미널.4)` 실습망을 띄우고 브리지를 확인합니다.
    ```bash
    cd ~/RookiRooki/scenarios/lab
@@ -32,14 +48,14 @@ Suricata(라이브, br-minisiem) → backend/data/live/eve.json → 백엔드 �
    ip link show br-minisiem
    ```
    `br-minisiem`은 `docker-compose.yml`의 `com.docker.network.bridge.name`으로 고정한 브리지 이름입니다.
-2. `(서버_터미널.1)` 라이브 로그 폴더를 **일반 사용자 권한으로** 만들고, 플래그를 켜서 백엔드를 실행합니다(`--reload`나 여러 worker 없이 프로세스 1개로 실행).
+2. `(서버_터미널.1, .venv 필요)` 라이브 로그 폴더를 **일반 사용자 권한으로** 만들고, 플래그를 켜서 백엔드를 실행합니다. **uvicorn은 `--reload`와 `--workers` 없이 프로세스 1개로 실행합니다**(폴링 스레드가 중복으로 생기지 않게 하기 위함).
    ```bash
    cd ~/RookiRooki
    source .venv/bin/activate
    mkdir -p backend/data/live
    LIVE_CAPTURE_ENABLED=1 uvicorn backend.main:app --port 8000
    ```
-3. `(라이브_터미널.8)` Suricata를 라이브로 시작합니다. 아래 명령은 `GET /api/live/status`의 `start_command`와 같습니다.
+3. `(라이브_터미널.8, .venv 불필요)` Suricata를 라이브로 시작합니다. 아래 명령은 `GET /api/live/status`의 `start_command`와 같습니다.
    ```bash
    cd ~/RookiRooki
    sudo suricata -i br-minisiem -S rules/custom.rules -l backend/data/live -k none --user $(id -un) --group $(id -gn) 'net 172.28.0.0/24'
@@ -89,7 +105,7 @@ Suricata(라이브, br-minisiem) → backend/data/live/eve.json → 백엔드 �
 
 ## 7. 한계
 
-- **다른 배치에 걸친 http 매칭**: `parse_eve`는 한 파일 안에서 `alert`와 `http`를 flow로 맞춥니다. 라이브에서는 배치마다 파싱하므로, 이전 배치에 있던 `http` 이벤트는 최근 200줄까지만 앞에 붙여서(그 줄들만으로는 경보가 생기지 않음) 맞춥니다. 반대로 **`alert`가 먼저 저장되고 해당 요청의 `http` 이벤트가 나중 배치에 도착하면** `http_status`가 비고 SEV1로 격상되지 않으며, 저장된 경보는 이후 갱신하지 않습니다(`INSERT OR IGNORE`). Suricata가 `alert`를 `http`보다 먼저 기록하는 빈도는 이 저장소에서 실측하지 않았으니 실습망에서 확인이 필요합니다.
+- **다른 배치에 걸친 http 매칭**: `parse_eve`는 한 파일 안에서 `alert`와 `http`를 flow로 맞춥니다. 라이브에서는 배치마다 파싱하므로, 이전 배치에 있던 `http` 이벤트는 최근 200줄까지만 앞에 붙여서 맞춥니다. 반대로 `alert`가 먼저 저장되고 해당 요청의 `http` 이벤트가 나중 배치에 도착하면, 그 배치를 저장할 때 `flow_id`가 같고 `http_status`가 비어 있는 `sqli`·`xss`·`ssrf` 행의 `http_status`, `severity`, `is_confirmed_risk`만 갱신합니다(상태 200이면 SEV1·`is_confirmed_risk=1`, 그 외 상태는 SEV3 유지하고 `http_status`만 기록). 두 이벤트에 URL이 모두 있으면 마스킹한 URL이 같을 때만 갱신하며, 행을 새로 만들지 않으므로 중복이 생기지 않습니다. 남은 한계: 이미 `http_status`가 채워진 행은 다시 바꾸지 않고, 백엔드 재시작 등으로 그 `http` 이벤트를 읽기 전에 offset이 지나갔다면 갱신되지 않으며, Suricata가 `alert`를 `http`보다 먼저 기록하는 빈도는 이 저장소에서 실측하지 않았으니 실습망에서 확인이 필요합니다.
 - `http` 문맥은 메모리에만 있어 백엔드를 재시작하면 비워집니다.
 - 로테이션 후 새 파일이 이미 저장된 offset보다 커져 있으면 감지하지 못합니다(크기 비교만 사용).
 - 읽는 파일은 `LIVE_EVE_PATH` 하나이며, Suricata가 살아 있는지는 확인하지 않습니다(`offset`과 `last_poll_at`으로만 추정).
