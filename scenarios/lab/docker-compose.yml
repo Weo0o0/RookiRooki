@@ -1,7 +1,6 @@
-# Mini-SIEM 실습망 초안 (저장소에 바로 커밋하지 말 것)
+# Mini-SIEM 실습망 공식 파일 (scenarios/lab/docker-compose.yml)
 # 확정 주소: DECISIONS.md 3번, README.md, docs/ARCHITECTURE.md
-# 파일 위치는 공식 폴더 트리에 없음 → PM·시나리오 담당과 합의 필요
-# (제안: 합의 후 scenarios/lab/ 또는 저장소 루트)
+# 위치: scenarios/lab/ (README.md 저장소 구조 참고)
 
 name: minisiem
 
