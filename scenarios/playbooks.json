@@ -23,7 +23,7 @@
     "category": "xss",
     "sid": 1000002,
     "name": "반사형 크로스 사이트 스크립팅(Reflected XSS) 관제 및 대응 플레이북",
-    "severity": "SEV2",
+    "severity": "MEDIUM",
     "description": "웹 파라미터(예: /search?q=)를 통한 악성 스크립트 삽입 및 세션 쿠키 탈취 시도 탐지 시 대응 절차",
     "preserve_evidence_first": "웹 데몬을 즉시 재시작하지 말고, 웹서버 액세스 로그에서 공격자가 주입한 악성 스크립트 문자열 및 Referer 헤더 사본을 먼저 확보할 것.",
     "actions": {
