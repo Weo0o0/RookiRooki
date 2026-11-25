@@ -156,3 +156,30 @@ def test_ipv4_outside_lab_net_only_counts_as_skipped(monkeypatch, tmp_path):
     poll(tmp_path)
     assert total(tmp_path) == 0
     assert live_capture.STATE["rows_stored"] == 0 and live_capture.STATE["rows_skipped_out_of_scope"] == 3
+
+def _late_http(status, url="/x"):
+    return json.dumps({"event_type": "http", "flow_id": 1, "tx_id": 0, "http": {"status": status, "url": url}}) + "\n"
+
+def _rows(tmp_path):
+    with sqlite3.connect(tmp_path / "a.db") as db:
+        return db.execute("SELECT http_status, severity, is_confirmed_risk FROM alerts").fetchall()
+
+def test_late_http_200_upgrades_stored_alert_to_sev1(monkeypatch, tmp_path):
+    eve = setup(monkeypatch, tmp_path)
+    put(eve, alert(1))
+    poll(tmp_path)
+    assert _rows(tmp_path) == [(None, "SEV3", 0)]
+    put(eve, _late_http(200), append=True)
+    poll(tmp_path)
+    assert _rows(tmp_path) == [(200, "SEV1", 1)]
+
+def test_late_http_403_keeps_sev3_and_records_status(monkeypatch, tmp_path):
+    eve = setup(monkeypatch, tmp_path)
+    put(eve, alert(1, sid=1000006))
+    poll(tmp_path)
+    put(eve, _late_http(403), append=True)
+    poll(tmp_path)
+    assert _rows(tmp_path) == [(403, "SEV3", 0)]
+    put(eve, _late_http(200), append=True)  # status is set only once
+    poll(tmp_path)
+    assert _rows(tmp_path) == [(403, "SEV3", 0)]

@@ -11,7 +11,7 @@ from contextlib import closing
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .eve_parser import parse_eve
+from .eve_parser import mask_text, parse_eve
 
 ROOT = Path(__file__).resolve().parent.parent
 LAB_NET = ipaddress.ip_network("172.28.0.0/24")
@@ -81,6 +81,28 @@ def save(db, eve_file, offset):
     db.commit()
     STATE["offset"] = offset
 
+def _apply_late_http(db, chunk):
+    # An http event that arrives after its alert row was stored: fill in status/severity once.
+    for line in chunk.splitlines():
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(event, dict) or event.get("event_type") != "http":
+            continue
+        data = event.get("http") if isinstance(event.get("http"), dict) else {}
+        status = data.get("status")
+        if event.get("flow_id") is None or isinstance(status, bool) or not isinstance(status, int):
+            continue
+        url = mask_text(data.get("url") or "")[0]
+        severity = "SEV1" if status == 200 else "SEV3"
+        db.execute(
+            "UPDATE alerts SET http_status = ?, severity = ?, is_confirmed_risk = ? "
+            "WHERE flow_id = ? AND category IN ('sqli','xss','ssrf') AND http_status IS NULL "
+            "AND (? = '' OR IFNULL(raw_url, '') = '' OR raw_url = ?)",
+            (status, severity, int(severity == "SEV1"), event["flow_id"], url, url),
+        )
+
 def _poll(db_file, eve_file, insert_rows):
     with closing(sqlite3.connect(db_file)) as db:
         db.execute(
@@ -111,6 +133,7 @@ def _poll(db_file, eve_file, insert_rows):
 
         in_scope = [r for r in rows if _in_lab(r["src_ip"]) and _in_lab(r["dest_ip"])]
         stored = insert_rows(db, in_scope)
+        _apply_late_http(db, chunk)
         save(db, eve_file, offset + len(chunk))
 
         STATE["rows_stored"] += stored
