@@ -2,7 +2,7 @@
 
 > **작업 위치 제안 (PM 합의 필요)**: 실습망 `scenarios/lab/`, pcap `scenarios/lab/pcaps/`, 플레이북 `scenarios/playbooks.json`
 
-팀 규격 v2(2026-11-24)에 맞춰 `ssrf`와 `c2_beacon`을 배제하고, **4대 공격 카테고리(`sqli`, `xss`, `bruteforce`, `portscan`)** 및 실습망 격리 환경(172.28.0.0/24)에 맞춘 관제 플레이북 기술 명세서입니다.
+팀 규격 v2(2026-11-24)에 맞춰 **6대 공격 카테고리(`sqli`, `xss`, `bruteforce`, `portscan`, `c2_beacon`, `ssrf`)** 및 실습망 격리 환경(172.28.0.0/24)에 맞춘 관제 플레이북 기술 명세서입니다.
 
 ---
 
@@ -14,6 +14,8 @@
 | **`xss`** | 1000002 | victim-web (172.28.0.10:80) | MEDIUM | 스크립트 문자열 검증 ➔ 포트 80 차단 ➔ 원복 |
 | **`bruteforce`** | 1000003 | victim-pc (172.28.0.11:22) | HIGH | SSH 실패 로그(`/var/log/auth.log`) 검증 ➔ 22 차단 ➔ 원복 |
 | **`portscan`** | 1000004 | web/pc (172.28.0.10, 11) | MEDIUM | SYN-RECV 소켓 검증 ➔ IP 전면 차단 ➔ 원복 |
+| **`c2_beacon`** | 1000005 | attacker(172.28.0.100) → victim-web(172.28.0.10:8443) | SEV2 | 30초 안 5회 반복 연결 검증 ➔ 출발지 차단 ➔ 원복 |
+| **`ssrf`** | 1000006 | victim-web(172.28.0.10:80) `/fetch?url=` | SEV3 (200이면 SEV1) | 요청 URL·응답 상태 보존 ➔ 출발지 차단 ➔ 원복 |
 
 ---
 
@@ -122,6 +124,56 @@
       "verify": "ufw status numbered | grep '{{SRC_IP}}'",                                                                                 // [검증] UFW 방화벽 룰 번호 및 정책 상태 확인
       "block": "ufw insert 1 deny from {{SRC_IP}} to any",                                                                                 // [차단] UFW 최상단에 해당 IP 발 모든 인바운드 거부 룰 삽입
       "rollback": "ufw delete deny from {{SRC_IP}} to any"                                                                                 // [원복] 등록된 IP 차단 룰 삭제
+    }
+  }
+}
+```
+
+### [플레이북 5] C2 Beacon (`c2_beacon`, SID: 1000005)
+
+```javascript
+{
+  "category": "c2_beacon", // [카테고리] 반복 C2 연결 탐지 분류 키
+  "sid": 1000005, // [SID 매핑] Suricata EVE signature_id: 1000005와 매칭
+  "name": "C2 beacon 반복 연결 관제 플레이북", // [제목] 관제 화면에 표시할 플레이북 명칭
+  "severity": "SEV2", // [심각도] PM 확정값. HTTP 200 격상 없음
+  "description": "attacker(172.28.0.100)에서 victim-web(172.28.0.10:8443)으로 30초 안에 5회 반복 연결하는 실습용 단순화 시나리오", // [개요] T1071.001 기반 반복 연결 요약
+  "preserve_evidence_first": "pcap과 연결 시각·서비스 로그를 먼저 보존한 뒤 출발지 IP를 차단할 것.", // [증거보존] 차단 전 네트워크 증거 선 보존
+  "actions": {
+    "linux": {
+      "verify": "ss -tanp '( sport = :{{DEST_PORT}} and src {{SRC_IP}} )' && journalctl --since '-5 min' | tail -n 50", // [검증] 목적지 포트의 반복 연결과 최근 서비스 로그 확인
+      "block": "iptables -I INPUT 1 -s {{SRC_IP}} -p tcp --dport {{DEST_PORT}} -j DROP", // [차단] 출발지 IP의 목적지 포트 접근 차단
+      "rollback": "iptables -D INPUT -s {{SRC_IP}} -p tcp --dport {{DEST_PORT}} -j DROP" // [원복] 등록한 차단 룰 삭제
+    },
+    "ufw": {
+      "verify": "ufw status numbered | grep '{{SRC_IP}}'", // [검증] UFW 정책 상태 확인
+      "block": "ufw insert 1 deny from {{SRC_IP}} to any port {{DEST_PORT}} proto tcp", // [차단] 출발지 IP의 목적지 포트 차단
+      "rollback": "ufw delete deny from {{SRC_IP}} to any port {{DEST_PORT}} proto tcp" // [원복] UFW 차단 룰 삭제
+    }
+  }
+}
+```
+
+### [플레이북 6] SSRF (`ssrf`, SID: 1000006)
+
+```javascript
+{
+  "category": "ssrf", // [카테고리] 서버 측 요청 위조 탐지 분류 키
+  "sid": 1000006, // [SID 매핑] Suricata EVE signature_id: 1000006과 매칭
+  "name": "SSRF 내부 자원 접근 관제 플레이북", // [제목] 관제 화면에 표시할 플레이북 명칭
+  "severity": "SEV3", // [심각도] 백엔드 기본값. HTTP 200 요청은 SEV1로 격상
+  "description": "The /fetch?url= endpoint receives an internal URL; HTTP 200 escalates to SEV1, while HTTP 403 means the internal target refused the connection and was not blocked.", // [개요] T1190 기반 내부 자원 조회 요약
+  "preserve_evidence_first": "요청 URL·HTTP 상태·애플리케이션 로그와 pcap을 먼저 보존할 것.", // [증거보존] 차단 전 HTTP·앱·패킷 증거 선 보존
+  "actions": {
+    "linux": {
+      "verify": "ss -tanp '( sport = :{{DEST_PORT}} and src {{SRC_IP}} )' && docker logs --since 5m victim-web | grep '{{SRC_IP}}'", // [검증] victim-web 소켓과 Python 표준출력 로그 확인
+      "block": "iptables -I INPUT 1 -s {{SRC_IP}} -p tcp --dport {{DEST_PORT}} -j DROP", // [차단] 출발지 IP의 웹 서비스 접근 차단
+      "rollback": "iptables -D INPUT -s {{SRC_IP}} -p tcp --dport {{DEST_PORT}} -j DROP" // [원복] 등록한 차단 룰 삭제
+    },
+    "ufw": {
+      "verify": "ufw status numbered | grep '{{SRC_IP}}'", // [검증] UFW 정책 상태 확인
+      "block": "ufw insert 1 deny from {{SRC_IP}} to any port {{DEST_PORT}} proto tcp", // [차단] 출발지 IP의 목적지 포트 차단
+      "rollback": "ufw delete deny from {{SRC_IP}} to any port {{DEST_PORT}} proto tcp" // [원복] UFW 차단 룰 삭제
     }
   }
 }
