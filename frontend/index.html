@@ -948,6 +948,7 @@
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         alertsData = Array.isArray(data) ? data : (data.items || data.alerts || []);
+        if (isLiveMode) notifyNewAlerts(alertsData);
 
         let stats = null;
         try {
@@ -971,8 +972,70 @@
       }
     }
 
+    // Live 폴링 새 알림 토스트: 첫 응답은 기준선으로만 기록
+    let seenAlertIds = null;
+
+    function notifyNewAlerts(list) {
+      const ids = list.map(a => String(a.id));
+      if (seenAlertIds === null) {
+        seenAlertIds = new Set(ids);
+        return;
+      }
+      const fresh = list.filter(a => !seenAlertIds.has(String(a.id)));
+      ids.forEach(id => seenAlertIds.add(id));
+      if (fresh.length) showAlertToast(fresh);
+    }
+
+    function showAlertToast(items) {
+      let box = document.getElementById("toastBox");
+      if (!box) {
+        box = document.createElement("div");
+        box.id = "toastBox";
+        box.className = "fixed bottom-4 right-4 z-50 flex flex-col gap-2 w-80 max-w-[90vw]";
+        document.body.appendChild(box);
+      }
+      const hasSev1 = items.some(a => a.severity === "SEV1");
+      const toast = document.createElement("div");
+      toast.className = "rounded-lg bg-slate-800 text-slate-100 shadow-lg p-3 text-sm border-l-4 " +
+        (hasSev1 ? "border-red-500 ring-2 ring-red-500" : "border-sky-500");
+
+      const head = document.createElement("div");
+      head.className = "flex items-center justify-between mb-1";
+      const title = document.createElement("span");
+      title.className = "font-bold";
+      title.textContent = items.length > 1 ? `새 알림 ${items.length}건` : "새 알림";
+      head.appendChild(title);
+      if (hasSev1) {
+        const badge = document.createElement("span");
+        badge.className = "ml-2 px-1.5 rounded bg-red-600 text-white text-xs font-bold";
+        badge.textContent = "SEV1";
+        head.appendChild(badge);
+      }
+      const close = document.createElement("button");
+      close.className = "ml-auto pl-2 text-slate-400 hover:text-white";
+      close.textContent = "×";
+      close.addEventListener("click", () => toast.remove());
+      head.appendChild(close);
+      toast.appendChild(head);
+
+      items.slice(0, 4).forEach(a => {
+        const row = document.createElement("div");
+        row.className = "truncate " + (a.severity === "SEV1" ? "text-red-300 font-semibold" : "text-slate-300");
+        row.textContent = `[${a.severity || "-"}] ${a.category || a.signature || "-"} · ${a.src_ip || "?"} → ${a.dest_ip || "?"}`;
+        toast.appendChild(row);
+      });
+      if (items.length > 4) {
+        const more = document.createElement("div");
+        more.className = "text-slate-400 text-xs mt-1";
+        more.textContent = `외 ${items.length - 4}건`;
+        toast.appendChild(more);
+      }
+      box.appendChild(toast);
+      setTimeout(() => toast.remove(), 7000);
+    }
     function startPolling() {
       if (pollingTimer) clearInterval(pollingTimer);
+      seenAlertIds = null;
       fetchDashboardData();
       pollingTimer = setInterval(fetchDashboardData, 5000);
     }
