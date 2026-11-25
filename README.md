@@ -79,8 +79,17 @@ Stage 1에서 프론트·백엔드가 맞출 인터페이스입니다. 앞의 �
 | `PATCH` | `/api/alerts/{id}/triage` | 분석가 판정 저장 | `verdict`(`TP`/`FP`/`UNREVIEWED`), `observation`, `assessment`, `confidence`(`HIGH`/`MEDIUM`/`LOW`) | 갱신 결과 |
 | `POST` | `/api/pcap/upload` | pcap 업로드 후 `suricata -r` | `multipart/form-data`, `.pcap` 또는 `.pcapng`, 최대 20MB | 분석 요약(적재 건수 등) |
 | `GET` | `/api/stats` | 심각도 집계, MITRE 커버리지, 로그 단절(Blind) 룰 | 없음 | `severity_counts`, `mitre_coverage`, `blind_rules` 등 |
+| `GET` | `/api/live/status` | (선택 기능, 기본 꺼짐) 라이브 캡처 상태·시작/중지 안내 | 없음 | `enabled`, `eve_path`, `offset`, `last_poll_at`, `rows_stored`, `rows_skipped_out_of_scope`, `last_error`, `start_command`, `stop_command` |
 
 경보 JSON의 핵심 키는 `id`, `timestamp`, `sid`, `category`, `signature`, `mitre_id`, `src_ip`, `dest_ip`, `dest_port`, `http_status`, `severity`, `is_confirmed_risk`, `pii_masked`, `raw_url`, `verdict`, `observation`, `assessment`, `confidence`, `playbook`입니다. 스키마 상세는 [ARCHITECTURE.md](docs/ARCHITECTURE.md)를 참고하세요.
+
+### 선택 기능: 라이브 캡처 ingest (기본 꺼짐, 팀 합의 후 사용)
+
+Backlog의 Stage 2 항목을 **선택 기능**으로 미리 구현해 둔 것입니다. 환경변수 `LIVE_CAPTURE_ENABLED=1`을 직접 지정할 때만 동작하며, 지정하지 않으면 위의 pcap 업로드·샘플 적재 흐름은 그대로이고 폴링 스레드도 새 테이블 쓰기도 없습니다. **팀 합의 후에 사용하세요.**
+
+- 사용자가 자기 Ubuntu 터미널에서 `sudo suricata -i br-minisiem ...`로 브리지를 라이브 캡처하면, 백엔드가 `backend/data/live/eve.json`을 읽어 기존 파서로 저장합니다. 백엔드는 Suricata를 시작·중지하지 않고 `sudo`도 호출하지 않습니다(root 권한이 필요하므로 안내만 제공).
+- `src_ip`와 `dest_ip`가 모두 `172.28.0.0/24` 안인 경보만 저장합니다.
+- 시작·중지 명령, 터미널별 역할, offset·중복 규칙, 한계는 [docs/live_capture_guide.md](docs/live_capture_guide.md)를 참고하세요.
 
 ## 저장소 구조
 
@@ -89,6 +98,7 @@ mini-siem/
 ├── backend/                      # 백엔드 (FastAPI, SQLite, 파서)
 │   ├── main.py
 │   ├── eve_parser.py
+│   ├── live_capture.py           # 선택 기능: 라이브 eve.json 폴링 (기본 꺼짐)
 │   ├── requirements.txt
 │   └── tests/
 ├── frontend/                     # 프론트엔드 (단일 HTML SOC 대시보드)
@@ -109,6 +119,7 @@ mini-siem/
 │   ├── ARCHITECTURE.md
 │   ├── sample_eve_guide.md
 │   ├── playbooks_guide.md
+│   ├── live_capture_guide.md
 │   └── 설치_테스트_가이드.md
 ├── ai-guides/                    # 역할별 AI 프롬프트 및 가이드
 │   ├── mini_siem_ai.md
