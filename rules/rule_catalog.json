@@ -8,7 +8,10 @@
     "mitre_id": "T1190",
     "base_severity": "SEV3",
     "escalated_severity": "SEV1",
-    "data_sources": ["suricata_alert", "suricata_http"],
+    "data_sources": [
+      "suricata_alert",
+      "suricata_http"
+    ],
     "false_positives": [
       "자유 입력값에 따옴표 뒤 -- 가 오는 일반 문장 (예: \"hi\" -- bob) - 2026-11-24 재현 확인",
       "검색어에 'union select' 단어가 그대로 포함된 경우 - 2026-11-24 재현 확인",
@@ -27,7 +30,10 @@
     "mitre_id": "T1189",
     "base_severity": "SEV3",
     "escalated_severity": "SEV1",
-    "data_sources": ["suricata_alert", "suricata_http"],
+    "data_sources": [
+      "suricata_alert",
+      "suricata_http"
+    ],
     "false_positives": [
       "사용자가 HTML 코드 조각을 그대로 검색하는 경우 (개발자 커뮤니티 등)",
       "보안 교육 자료처럼 '<script' 문자열을 포함한 검색"
@@ -44,7 +50,9 @@
     "mitre_id": "T1110.001",
     "base_severity": "SEV2",
     "escalated_severity": null,
-    "data_sources": ["suricata_alert"],
+    "data_sources": [
+      "suricata_alert"
+    ],
     "false_positives": [
       "관리자가 1분 안에 SSH 창을 여러 개 여는 경우",
       "scp/rsync를 연달아 실행하는 경우",
@@ -62,12 +70,53 @@
     "mitre_id": "T1046",
     "base_severity": "SEV3",
     "escalated_severity": null,
-    "data_sources": ["suricata_alert"],
+    "data_sources": [
+      "suricata_alert"
+    ],
     "false_positives": [
       "실습망에 서비스 포트를 추가했는데 룰의 제외 목록(22,80)을 갱신하지 않은 경우",
       "내부 모니터링 도구의 다중 포트 헬스 체크"
     ],
     "validation_pcap": "scenarios/lab/pcaps/lab_capture.pcap",
     "notes": "Suricata threshold는 '서로 다른 포트 수'를 세지 못하므로, hydra의 22번 반복과 겹치지 않게 실습망 서비스 포트(22,80)를 제외한 포트로 가는 SYN을 출발지 기준으로 집계. count 20 / 10초. 임계치 근거: nmap -sS 1-100 x 2대 -> SYN 196개 / 0.11초, 정상 트래픽은 0개. 중요: 오프라인 분석은 반드시 --runmode single로 실행할 것 - 멀티스레드 모드에서는 저속 스캔이 잘못 탐지되고 빠른 스캔은 놓치는 것을 확인. 경보의 dest_ip/dest_port는 임계치를 넘긴 패킷의 값(예: 172.28.0.10:78)이라 대표값이 아님 - 플레이북 {{DEST_PORT}} 사용 주의. 우회 테스트(--runmode single): 초당 1개 저속 스캔(25포트)은 미탐, 30포트/1초 빠른 스캔은 1건 탐지. 미대응: 저속 스캔, 22/80만 노린 스캔, FIN/NULL/XMAS 스캔. 기본 검증(lab_capture.pcap, my_capture.pcap): 각 1건 탐지."
+  },
+  {
+    "sid": 1000005,
+    "category": "c2_beacon",
+    "title": "C2 beacon - repeated connections to 8443",
+    "status": "testing",
+    "mitre_tactic": "Command and Control",
+    "mitre_id": "T1071.001",
+    "base_severity": "SEV2",
+    "escalated_severity": null,
+    "data_sources": [
+      "suricata_alert"
+    ],
+    "false_positives": [
+      "8443 포트로 주기적으로 상태를 확인하는 정상 헬스 체크·모니터링 에이전트",
+      "같은 출발지에서 30초 안에 8443 서비스를 여러 번 새로 고침하는 정상 사용자"
+    ],
+    "validation_pcap": "scenarios/lab/pcaps/c2_ssrf.pcap",
+    "notes": "PM 확정값(2026-11-25): 같은 출발지가 8443/tcp로 30초 안에 새 연결(SYN) 5회 이상이면 탐지. threshold type both, track by_src라 30초당 경보 1회. 녹화본은 attacker 172.28.0.100 -> victim-web 172.28.0.10:8443, 약 6초 간격 5회(첫~마지막 24초). 실제 C2는 보통 감염된 내부 PC가 바깥으로 접속하지만, 실습망에서는 위 방향으로 단순화함. C2 SYN(8443)도 포트스캔 룰 ![22,80] 집계에 들어가지만 6초 간격이라 포트스캔 기준(10초 20회)에 못 미쳐 영향 없음. MITRE T1071.001은 PM 확정 가안. 오프라인 분석은 --runmode single 필요(기본 멀티스레드에서는 같은 pcap의 portscan이 2건으로 나오는 현상 확인). 2026-11-25 검증(--runmode single): c2_ssrf.pcap에서 1건, lab_capture·web·ssh pcap에서 오탐 0. 미대응: 간격을 30초 이상으로 늘린 저속 비콘, 매번 다른 포트 사용, 8443 외 포트."
+  },
+  {
+    "sid": 1000006,
+    "category": "ssrf",
+    "title": "SSRF internal URL in fetch parameter",
+    "status": "testing",
+    "mitre_tactic": "Initial Access",
+    "mitre_id": "T1190",
+    "base_severity": "SEV3",
+    "escalated_severity": "SEV1",
+    "data_sources": [
+      "suricata_alert",
+      "suricata_http"
+    ],
+    "false_positives": [
+      "URL을 받아 미리보기를 만드는 정상 기능에 내부 링크를 넣은 경우",
+      "관리자가 /fetch로 내부 서비스 상태를 확인하는 정상 운영 요청"
+    ],
+    "validation_pcap": "scenarios/lab/pcaps/c2_ssrf.pcap",
+    "notes": "PM 확정값(2026-11-25): victim-web:80 GET /fetch?url=<내부 주소>. http.uri(URL 디코딩된 값)에서 /fetch? 로 시작하고 url 파라미터가 http/https/file/gopher 스킴 + 내부 주소(172.28., 127., localhost, 10., 192.168., 169.254.)를 가리키면 탐지. 해당 요청 응답이 200이면 백엔드가 SEV1로 격상. SSRF 403은 내부 대상이 접속을 거절한 경우로, 경보만 남고 SEV3. rev 1에서 팀장 초안에 주소 앞 사용자 정보(http://x@172.28.0.11/) 우회 대응을 추가함 - 실습 앱은 이 형태도 내부 접속을 허용하기 때문. 2026-11-25 검증(--runmode single): c2_ssrf.pcap에서 2건(200 1건, 403 1건), lab_capture·web·ssh pcap에서 오탐 0. 미대응: 10진수·16진수 IP(2130706433, 0x7f000001), 내부 주소로 풀리는 도메인 - 현재 실습 앱은 허용 호스트를 IP 문자열로 비교해서 이 우회로는 공격이 성립하지 않음."
   }
 ]
