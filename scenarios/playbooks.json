@@ -3,7 +3,7 @@
     "category": "sqli",
     "sid": 1000001,
     "name": "SQL 인젝션(SQLi) 관제 및 침해대응 플레이북",
-    "severity": "HIGH",
+    "severity": "SEV3",
     "description": "웹 애플리케이션 입력값 검증 부재를 악용한 SQL 인젝션 공격 시도 및 데이터베이스 정보 유출 탐지 시 대응 절차",
     "preserve_evidence_first": "서버 재부팅, 웹 서비스 재기동, 방화벽 차단 전 반드시 비정상 세션 현황(`ss -tanp`), 웹서버 접근/에러 로그 사본(`/var/log/nginx/` 또는 `/var/log/apache2/`), DB 쿼리 감사 로그 사본을 먼저 안전한 격리 스토리지로 백업 및 보존할 것.",
     "actions": {
@@ -23,7 +23,7 @@
     "category": "xss",
     "sid": 1000002,
     "name": "반사형 크로스 사이트 스크립팅(Reflected XSS) 관제 및 대응 플레이북",
-    "severity": "MEDIUM",
+    "severity": "SEV3",
     "description": "웹 파라미터(예: /search?q=)를 통한 악성 스크립트 삽입 및 세션 쿠키 탈취 시도 탐지 시 대응 절차",
     "preserve_evidence_first": "웹 데몬을 즉시 재시작하지 말고, 웹서버 액세스 로그에서 공격자가 주입한 악성 스크립트 문자열 및 Referer 헤더 사본을 먼저 확보할 것.",
     "actions": {
@@ -43,7 +43,7 @@
     "category": "bruteforce",
     "sid": 1000003,
     "name": "SSH 무차별 대입(Brute Force) 관제 및 침해대응 플레이북",
-    "severity": "HIGH",
+    "severity": "SEV2",
     "description": "victim-pc(172.28.0.11:22)를 대상으로 다수의 패스워드 대입을 통한 비인가 원격 셸 탈취 시도 탐지 시 대응 절차",
     "preserve_evidence_first": "서버 재부팅 금지. 현재 SSH 로그인 세션(`who`, `w`)과 실패 인증 감사 로그 사본(`/var/log/auth.log` 또는 `/var/log/secure`)을 우선 채증할 것.",
     "actions": {
@@ -63,7 +63,7 @@
     "category": "portscan",
     "sid": 1000004,
     "name": "포트 스캔(Port Scan / SYN Sweep) 관제 및 사전 차단 플레이북",
-    "severity": "MEDIUM",
+    "severity": "SEV3",
     "description": "실습망 자산(172.28.0.10, 172.28.0.11)의 오픈 포트 및 서비스 식별을 위한 무차별 SYN 정찰 패킷 탐지 시 대응 절차",
     "preserve_evidence_first": "방화벽 차단 전 실시간 비정상 SYN-RECV 소켓 상태 사본을 추출하고 패킷 덤프 사본을 우선 보존할 것.",
     "actions": {
