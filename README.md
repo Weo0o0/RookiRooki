@@ -91,8 +91,9 @@ mini-siem/
 │   ├── eve_parser.py
 │   ├── requirements.txt
 │   └── tests/
-├── frontend/                     # 프론트엔드 (단일 HTML SOC 대시보드 예정)
-│   └── README.md                 # index.html 구현 예정 안내
+├── frontend/                     # 프론트엔드 (단일 HTML SOC 대시보드)
+│   ├── index.html
+│   └── README.md
 ├── rules/                        # Suricata 커스텀 룰 및 카탈로그
 │   ├── custom.rules
 │   └── rule_catalog.json
@@ -107,7 +108,8 @@ mini-siem/
 ├── docs/                         # 설계 및 연동 가이드
 │   ├── ARCHITECTURE.md
 │   ├── sample_eve_guide.md
-│   └── playbooks_guide.md
+│   ├── playbooks_guide.md
+│   └── 설치_테스트_가이드.md
 ├── ai-guides/                    # 역할별 AI 프롬프트 및 가이드
 │   ├── mini_siem_ai.md
 │   └── ...
@@ -115,6 +117,8 @@ mini-siem/
 ```
 
 ## 실행 방법
+
+자세한 설치·테스트 절차는 [docs/설치_테스트_가이드.md](docs/설치_테스트_가이드.md) 참고
 
 아래는 표준 실행 절차입니다. 백엔드는 이미 구현되어 로컬에서 바로 실행할 수 있습니다.
 
@@ -126,7 +130,7 @@ mini-siem/
 2. **오프라인 룰 검사 (룰·백엔드 점검용)**  
    ```bash
    mkdir -p /tmp/suricata_out
-   suricata -r scenarios/lab/pcaps/lab_capture.pcap -S rules/custom.rules -l /tmp/suricata_out
+   suricata -r scenarios/lab/pcaps/lab_capture.pcap -S rules/custom.rules -l /tmp/suricata_out -k none --runmode single
    ```
 3. **백엔드**  
    ```bash
@@ -135,7 +139,7 @@ mini-siem/
    ```
    API 문서는 `http://localhost:8000/docs`에서 확인합니다. 샘플 로그는 `POST /api/ingest/sample`, 녹화 파일은 `POST /api/pcap/upload`로 넣습니다.
 4. **대시보드**  
-   `frontend/index.html`을 열고, 백엔드가 준비되면 Mock 모드를 끄고 Live API(`http://localhost:8000`)에 연결합니다.
+   `cd frontend && python3 -m http.server 5500`으로 서버를 띄우고 `http://localhost:5500`에 접속합니다(`ALLOWED_ORIGINS` 때문에 `file://`로 열면 CORS 오류가 납니다). 백엔드가 준비되면 Mock 모드를 끄고 Live API(`http://localhost:8000`)에 연결합니다.
 
 ## 4일 일정
 

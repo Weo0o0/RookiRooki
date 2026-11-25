@@ -2,11 +2,11 @@
 
 > **작업 위치 제안 (PM 합의 필요)**: 실습망 `scenarios/lab/`, pcap `scenarios/lab/pcaps/`, EVE 샘플 `scenarios/sample_eve.json`
 
-팀 규격 v2(2026-11-24)에 맞춰 `ssrf`와 `c2_beacon`을 완전히 배제하고, **4대 공격 카테고리(`sqli`, `xss`, `bruteforce`, `portscan`)** 및 실습망(attacker `172.28.0.100`, victim-web `172.28.0.10`, victim-pc `172.28.0.11`)에 맞춘 명세서입니다.
+팀 규격 v2(2026-11-24)에 맞춰 **6종 공격 카테고리(`sqli`, `xss`, `bruteforce`, `portscan`, `c2_beacon`, `ssrf`)** 및 실습망(attacker `172.28.0.100`, victim-web `172.28.0.10`, victim-pc `172.28.0.11`)에 맞춘 명세서입니다.
 
 ---
 
-## 1. 4대 공격 카테고리 매핑 요약 (총 8개 세션 / 16개 이벤트)
+## 1. 6종 공격 카테고리 매핑 요약 (총 12개 세션 / 24개 이벤트)
 
 | Flow ID | 공격 카테고리 | SID | 대상 IP:포트 | 상태 / L4 상태 | 설명 |
 | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -16,8 +16,12 @@
 | **2001004** | `xss` | 1000002 | `172.28.0.10:80` | **403 Forbidden** | WAF/보안필터 차단 가상 케이스 (EVE 전용) |
 | **2001005** | `bruteforce`| 1000003 | `172.28.0.11:22` | TCP Established | SSH 무차별 대입 시도 허용 (암호화 페이로드 제외) |
 | **2001006** | `bruteforce`| 1000003 | `172.28.0.11:22` | TCP Closed | SSH 무차별 대입 인라인 차단 |
-| **2001007** | `portscan` | 1000004 | `172.28.0.10:80` | SYN Sweep / Reset | 단일 포트 정찰 시도 허용 |
+| **2001007** | `portscan` | 1000004 | `172.28.0.10:8080` | SYN Sweep / Reset | 단일 포트 정찰 시도 허용 |
 | **2001008** | `portscan` | 1000004 | `172.28.0.11:8080`| SYN Sweep / Drop | 비인가 포트 정찰 방화벽 드롭(차단) |
+| **2001009** | `c2_beacon` | 1000005 | `172.28.0.10:8443` | TCP Established | C2 비콘 반복 연결 허용 |
+| **2001010** | `c2_beacon` | 1000005 | `172.28.0.10:8443` | TCP Established | C2 비콘 반복 연결 인라인 차단 (blocked) |
+| **2001011** | `ssrf` | 1000006 | `172.28.0.10:80` | **200 OK** | `/fetch?url=` 로 내부 `http://172.28.0.10/health` 접근 성공 |
+| **2001012** | `ssrf` | 1000006 | `172.28.0.10:80` | **403 Forbidden** | `/fetch?url=` 로 내부 `http://172.28.0.11:8080/health` 접근 실패 및 차단 |
 
 ---
 
@@ -73,10 +77,10 @@
 
 ### [세션 7] Port Scan (`portscan`) - 포트 스캔 허용/탐지 (13~14행)
 ```javascript
-// 13행: [L4 Flow 트랜잭션] victim-web(172.28.0.10:80) SYN 스캔 패킷
-{"flow_id":2001007,"event_type":"flow","src_ip":"172.28.0.100","src_port":52107,"dest_ip":"172.28.0.10","dest_port":80,"proto":"TCP","flow":{"pkts_toserver":1,"pkts_toclient":1,"bytes_toserver":60,"bytes_toclient":40,"state":"closed","reason":"reset"}}
+// 13행: [L4 Flow 트랜잭션] victim-web(172.28.0.10:8080) SYN 스캔 패킷
+{"flow_id":2001007,"event_type":"flow","src_ip":"172.28.0.100","src_port":52107,"dest_ip":"172.28.0.10","dest_port":8080,"proto":"TCP","flow":{"pkts_toserver":1,"pkts_toclient":1,"bytes_toserver":60,"bytes_toclient":40,"state":"closed","reason":"reset"}}
 // 14행: [보안 탐지 알람] SYN Sweep 포트 스캐닝 탐지 알람 (SID: 1000004, Allowed)
-{"flow_id":2001007,"event_type":"alert","src_ip":"172.28.0.100","src_port":52107,"dest_ip":"172.28.0.10","dest_port":80,"proto":"TCP","alert":{"action":"allowed","gid":1,"signature_id":1000004,"rev":1,"signature":"MINI-SIEM Port Scan SYN Sweep Detected","category":"portscan","severity":3}}
+{"flow_id":2001007,"event_type":"alert","src_ip":"172.28.0.100","src_port":52107,"dest_ip":"172.28.0.10","dest_port":8080,"proto":"TCP","alert":{"action":"allowed","gid":1,"signature_id":1000004,"rev":1,"signature":"MINI-SIEM Port Scan SYN Sweep Detected","category":"portscan","severity":3}}
 ```
 
 ### [세션 8] Port Scan (`portscan`) - 비인가 포트 스캔 드롭/차단 (15~16행)
@@ -85,4 +89,36 @@
 {"flow_id":2001008,"event_type":"flow","src_ip":"172.28.0.100","src_port":52108,"dest_ip":"172.28.0.11","dest_port":8080,"proto":"TCP","flow":{"pkts_toserver":1,"pkts_toclient":0,"bytes_toserver":60,"bytes_toclient":0,"state":"closed","reason":"drop"}}
 // 16행: [보안 탐지 알람] 방화벽 정책에 의한 비인가 포트 스캔 차단 경보 (Blocked)
 {"flow_id":2001008,"event_type":"alert","src_ip":"172.28.0.100","src_port":52108,"dest_ip":"172.28.0.11","dest_port":8080,"proto":"TCP","alert":{"action":"blocked","gid":1,"signature_id":1000004,"rev":1,"signature":"MINI-SIEM Port Scan SYN Sweep Detected","category":"portscan","severity":3}}
+```
+
+### [세션 9] C2 Beacon (`c2_beacon`) - 반복 연결 허용 (17~18행)
+```javascript
+// 17행: [L4 Flow 트랜잭션] victim-web(172.28.0.10:8443) 대상 반복 TCP 연결 통계
+{"flow_id":2001009,"event_type":"flow","src_ip":"172.28.0.100","src_port":52201,"dest_ip":"172.28.0.10","dest_port":8443,"proto":"TCP","flow":{"pkts_toserver":5,"pkts_toclient":5,"bytes_toserver":420,"bytes_toclient":380,"state":"established"}}
+// 18행: [보안 탐지 알람] C2 비콘 반복 연결 탐지 알람 (SID: 1000005, Allowed)
+{"flow_id":2001009,"event_type":"alert","src_ip":"172.28.0.100","src_port":52201,"dest_ip":"172.28.0.10","dest_port":8443,"proto":"TCP","alert":{"action":"allowed","gid":1,"signature_id":1000005,"rev":1,"signature":"MINI-SIEM C2 Beacon Repeated Connection Detected","category":"c2_beacon","severity":2}}
+```
+
+### [세션 10] C2 Beacon (`c2_beacon`) - 반복 연결 차단 (19~20행)
+```javascript
+// 19행: [L4 Flow 트랜잭션] victim-web(172.28.0.10:8443) 대상 반복 TCP 연결 통계
+{"flow_id":2001010,"event_type":"flow","src_ip":"172.28.0.100","src_port":52202,"dest_ip":"172.28.0.10","dest_port":8443,"proto":"TCP","flow":{"pkts_toserver":5,"pkts_toclient":5,"bytes_toserver":420,"bytes_toclient":380,"state":"established"}}
+// 20행: [보안 탐지 알람] C2 비콘 반복 연결 차단 기록 (SID: 1000005, Blocked)
+{"flow_id":2001010,"event_type":"alert","src_ip":"172.28.0.100","src_port":52202,"dest_ip":"172.28.0.10","dest_port":8443,"proto":"TCP","alert":{"action":"blocked","gid":1,"signature_id":1000005,"rev":1,"signature":"MINI-SIEM C2 Beacon Repeated Connection Detected","category":"c2_beacon","severity":2}}
+```
+
+### [세션 11] SSRF (`ssrf`) - 200 OK 내부 자원 접근 성공 (21~22행)
+```javascript
+// 21행: [HTTP 트랜잭션] /fetch?url= 로 내부 http://172.28.0.10/health 요청, 200 OK 응답
+{"flow_id":2001011,"event_type":"http","src_ip":"172.28.0.100","src_port":52203,"dest_ip":"172.28.0.10","dest_port":80,"proto":"TCP","http":{"hostname":"lab-web.local","url":"/fetch?url=http%3A%2F%2F172.28.0.10%2Fhealth","http_method":"GET","status":200}}
+// 22행: [보안 탐지 알람] SSRF 룰(SID: 1000006) 탐지 알람 (Allowed)
+{"flow_id":2001011,"event_type":"alert","src_ip":"172.28.0.100","src_port":52203,"dest_ip":"172.28.0.10","dest_port":80,"proto":"TCP","alert":{"action":"allowed","gid":1,"signature_id":1000006,"rev":1,"signature":"MINI-SIEM SSRF Internal Resource Access Detected","category":"ssrf","severity":1}}
+```
+
+### [세션 12] SSRF (`ssrf`) - 403 Forbidden 접근 실패/차단 (23~24행)
+```javascript
+// 23행: [HTTP 트랜잭션] /fetch?url= 로 내부 http://172.28.0.11:8080/health 요청, 403 Forbidden 응답
+{"flow_id":2001012,"event_type":"http","src_ip":"172.28.0.100","src_port":52204,"dest_ip":"172.28.0.10","dest_port":80,"proto":"TCP","http":{"hostname":"lab-web.local","url":"/fetch?url=http%3A%2F%2F172.28.0.11%3A8080%2Fhealth","http_method":"GET","status":403}}
+// 24행: [보안 탐지 알람] SSRF 요청 차단 경보 (Blocked)
+{"flow_id":2001012,"event_type":"alert","src_ip":"172.28.0.100","src_port":52204,"dest_ip":"172.28.0.10","dest_port":80,"proto":"TCP","alert":{"action":"blocked","gid":1,"signature_id":1000006,"rev":1,"signature":"MINI-SIEM SSRF Internal Resource Access Detected","category":"ssrf","severity":2}}
 ```
