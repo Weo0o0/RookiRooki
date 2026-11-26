@@ -183,7 +183,7 @@
             <p id="kpiConfirmed" class="text-2xl font-bold mt-1 text-amber-400">0</p>
           </div>
           <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
-            <p class="text-xs text-slate-400">미검토 (UNREVIEWED)</p>
+            <p class="text-xs text-slate-400">보류(미확정) (UNREVIEWED)</p>
             <p id="kpiUnreviewed" class="text-2xl font-bold mt-1 text-sky-400">0</p>
           </div>
         </div>
@@ -213,10 +213,15 @@
               />
               <select id="filterVerdict" class="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-slate-200">
                 <option value="ALL">전체 판정</option>
-                <option value="UNREVIEWED">미검토 (UNREVIEWED)</option>
+                <option value="UNREVIEWED">보류(미확정) (UNREVIEWED)</option>
                 <option value="TP">정탐 (TP)</option>
                 <option value="FP">오탐 (FP)</option>
               </select>
+              <label class="inline-flex items-center gap-1.5 px-2 py-1 text-slate-300 whitespace-nowrap">
+                <input id="includeFpToggle" type="checkbox" class="accent-sky-500" />
+                <span>오탐(FP) 포함해서 보기</span>
+              </label>
+              <span id="fpHiddenCount" class="hidden self-center text-amber-300 whitespace-nowrap"></span>
               <select id="filterCategory" class="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-slate-200">
                 <option value="ALL">전체 카테고리</option>
                 <option value="sqli">SQLi (1000001)</option>
@@ -289,7 +294,7 @@
                 <div>
                   <label class="block text-slate-400 mb-1">판정 (Verdict)</label>
                   <select id="triageVerdict" class="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1.5 text-white">
-                    <option value="UNREVIEWED">UNREVIEWED (미검토)</option>
+                    <option value="UNREVIEWED">보류(미확정) (UNREVIEWED)</option>
                     <option value="TP">TP (정탐)</option>
                     <option value="FP">FP (오탐)</option>
                   </select>
@@ -304,15 +309,31 @@
                 </div>
               </div>
 
+              <div class="grid grid-cols-2 gap-3 text-xs">
+                <div>
+                  <label for="triageAnalyst" class="block text-slate-400 mb-1">담당자</label>
+                  <input id="triageAnalyst" type="text" maxlength="50"
+                    class="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1.5 text-white focus:outline-none focus:border-sky-500" />
+                </div>
+                <div>
+                  <label for="triageActionStatus" class="block text-slate-400 mb-1">조치 상태</label>
+                  <select id="triageActionStatus" class="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1.5 text-white">
+                    <option value="ISOLATED">격리함</option>
+                    <option value="GUIDE_ONLY">안내만</option>
+                    <option value="NONE">없음</option>
+                  </select>
+                </div>
+              </div>
+
               <div class="text-xs">
                 <label class="block text-slate-400 mb-1">관찰된 사실 (Observation / Fact)</label>
-                <textarea id="triageObservation" rows="2" placeholder="예: 172.28.0.100에서 /login?id=' OR 1=1-- 요청 후 HTTP 200 응답 확인"
+                <textarea id="triageObservation" rows="2" maxlength="2000" placeholder="예: 172.28.0.100에서 /login?id=' OR 1=1-- 요청 후 HTTP 200 응답 확인"
                   class="w-full bg-slate-800 border border-slate-700 rounded p-2 text-white focus:outline-none focus:border-sky-500"></textarea>
               </div>
 
               <div class="text-xs">
                 <label class="block text-slate-400 mb-1">분석가 추정 (Assessment)</label>
-                <textarea id="triageAssessment" rows="2" placeholder="예: 인증 우회 시도가 성공했을 가능성이 높으며 추가 DB 접근 로그 확인 필요"
+                <textarea id="triageAssessment" rows="2" maxlength="2000" placeholder="예: 인증 우회 시도가 성공했을 가능성이 높으며 추가 DB 접근 로그 확인 필요"
                   class="w-full bg-slate-800 border border-slate-700 rounded p-2 text-white focus:outline-none focus:border-sky-500"></textarea>
               </div>
 
@@ -324,12 +345,13 @@
               <div class="bg-slate-950 border border-slate-800 rounded-lg p-3 space-y-2.5">
                 <div class="flex items-center justify-between">
                   <h4 class="text-xs font-bold uppercase tracking-wider text-rose-400">승인 기반 임시 대응 (SOAR 시뮬레이션)</h4>
-                  <span id="containmentStatusBadge" class="text-[11px] text-slate-500">격리 안 됨</span>
+                  <span id="containmentStatusBadge" class="text-[11px] text-slate-500">시뮬레이션 · 실제 차단 아님</span>
                 </div>
+                <p class="text-[11px] text-amber-300">시뮬레이션 · 실제 차단 아님</p>
                 <div class="grid grid-cols-2 gap-2 text-xs">
                   <button type="button" id="btnToggleContainment"
                     class="bg-rose-600 hover:bg-rose-500 text-white font-semibold py-2 px-3 rounded-lg transition">
-                    🛡️ 출발지 IP 임시 차단 (10분)
+                    🛡️ 출발지 IP 차단 시뮬레이션 (10분)
                   </button>
                   <button type="button" id="btnSendDiscordAlert"
                     class="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-2 px-3 rounded-lg transition">
@@ -588,6 +610,7 @@
     let pollingTimer = null;
     let pollingGeneration = 0;
     let dashboardRequestId = 0;
+    let suppressNextAlertNotifications = false;
     let categoryChartInstance = null;
     let currentVizTab = "flow"; // "flow" | "topology" | "osi"
 
@@ -1103,12 +1126,27 @@
         "마지막 갱신: " + new Date().toLocaleTimeString("ko-KR");
     }
 
+    function showTriageToast(message, isError = false) {
+      const container = document.getElementById("webToastContainer");
+      const toast = document.createElement("div");
+      toast.className = `pointer-events-auto rounded-lg p-3 text-sm shadow-lg border ${
+        isError
+          ? "bg-rose-950 border-rose-700 text-rose-100"
+          : "bg-slate-800 border-sky-600 text-slate-100"
+      }`;
+      toast.textContent = message;
+      container.appendChild(toast);
+      setTimeout(() => toast.remove(), 5000);
+    }
+
     function clearDetailPanel() {
       selectedAlertId = null;
       document.getElementById("detailPanel").classList.add("hidden");
       document.getElementById("emptyDetail").classList.remove("hidden");
       document.getElementById("triageVerdict").value = "UNREVIEWED";
       document.getElementById("triageConfidence").value = "MEDIUM";
+      document.getElementById("triageAnalyst").value = "";
+      document.getElementById("triageActionStatus").value = "NONE";
       document.getElementById("triageObservation").value = "";
       document.getElementById("triageAssessment").value = "";
       document.getElementById("playbookContainer").innerHTML = "";
@@ -1133,7 +1171,18 @@
       if (!isLiveMode) {
         if (!isCurrentRequest()) return;
         document.getElementById("liveStatusPanel").classList.add("hidden");
-        alertsData = JSON.parse(JSON.stringify(MOCK_ALERTS));
+        const includeFp = shouldIncludeFp();
+        const allAlerts = JSON.parse(JSON.stringify(MOCK_ALERTS));
+        alertsData = includeFp
+          ? allAlerts
+          : allAlerts.filter(alert => (alert.verdict || "UNREVIEWED") !== "FP");
+        updateFpHiddenCount(includeFp ? null : allAlerts.length - alertsData.length);
+        if (
+          alertsData.length === 0 ||
+          (selectedAlertId !== null && !alertsData.some(a => String(a.id) === String(selectedAlertId)))
+        ) {
+          clearDetailPanel();
+        }
         renderDashboardOverview();
         setStatus("🟡 Mock 데이터 모드로 동작 중입니다. (백엔드 없이 테스트 가능)");
         return;
@@ -1141,7 +1190,10 @@
 
       fetchLiveStatus(generation);
       try {
-        const res = await fetch(`${API_BASE}/api/alerts?limit=200`);
+        const includeFp = shouldIncludeFp();
+        const params = new URLSearchParams({ limit: "200" });
+        if (includeFp) params.set("include_fp", "1");
+        const res = await fetch(`${API_BASE}/api/alerts?${params.toString()}`);
         if (!isCurrentRequest() || !isLiveMode) return;
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
@@ -1150,13 +1202,39 @@
           throw new Error("API 응답에 items 목록이 없습니다.");
         }
         alertsData = data.items;
-        notifyNewAlerts(alertsData);
+        notifyNewAlerts(alertsData, suppressNextAlertNotifications);
+        suppressNextAlertNotifications = false;
+        lastLiveIncludeFp = includeFp;
+
+        let fpCountError = "";
+        if (includeFp) {
+          updateFpHiddenCount(null);
+        } else {
+          try {
+            const includedTotal = await fetchAlertTotal(true);
+            if (!isCurrentRequest() || !isLiveMode) return;
+            const defaultTotal = Number(data.total);
+            if (data.total === null || !Number.isFinite(defaultTotal) || defaultTotal < 0) {
+              throw new Error("API 응답에 유효한 total 값이 없습니다.");
+            }
+            updateFpHiddenCount(Math.max(0, includedTotal - defaultTotal));
+          } catch (err) {
+            if (!isCurrentRequest() || !isLiveMode) return;
+            updateFpHiddenCount(null);
+            fpCountError = ` · 오탐 숨김 건수 확인 실패 (${err.message})`;
+          }
+        }
 
         let stats = null;
+        let statsError = "";
         try {
-          const statsRes = await fetch(`${API_BASE}/api/stats`);
-          if (statsRes.ok) stats = await statsRes.json();
-        } catch (_) {}
+          const statsQuery = includeFp ? "?include_fp=1" : "";
+          const statsRes = await fetch(`${API_BASE}/api/stats${statsQuery}`);
+          if (!statsRes.ok) throw new Error(`HTTP ${statsRes.status}`);
+          stats = await statsRes.json();
+        } catch (err) {
+          statsError = ` · 통계 조회 실패 (${err.message})`;
+        }
         if (!isCurrentRequest() || !isLiveMode) return;
 
         if (
@@ -1167,7 +1245,10 @@
         }
 
         renderDashboardOverview(stats);
-        setStatus(`🟢 Live API 연결됨 (${API_BASE}) · 5초 주기 자동 갱신 중`);
+        setStatus(
+          `🟢 Live API 연결됨 (${API_BASE}) · 5초 주기 자동 갱신 중${fpCountError}${statsError}`,
+          Boolean(fpCountError || statsError)
+        );
       } catch (err) {
         if (!isCurrentRequest() || !isLiveMode) return;
         setStatus(`🔴 API 연결 실패 (${err.message}) - 백엔드 서버 상태를 확인하세요.`, true);
@@ -1245,8 +1326,9 @@
 
     // Live 폴링 신규 경보: 첫 응답은 기존 경보 기준선으로만 처리
     let seenAlertIds = null;
+    let lastLiveIncludeFp = null;
 
-    function notifyNewAlerts(list) {
+    function notifyNewAlerts(list, suppressNew = false) {
       const ids = list.map(a => String(a.id));
       if (seenAlertIds === null) {
         seenAlertIds = new Set(ids);
@@ -1254,10 +1336,13 @@
       }
       const fresh = list.filter(a => !seenAlertIds.has(String(a.id)));
       ids.forEach(id => seenAlertIds.add(id));
-      if (!fresh.length) return;
+      const reportableFresh = suppressNew
+        ? fresh.filter(alert => (alert.verdict || "UNREVIEWED") !== "FP")
+        : fresh;
+      if (!reportableFresh.length) return;
 
-      showAlertToast(fresh);
-      fresh.forEach(alert => {
+      showAlertToast(reportableFresh);
+      reportableFresh.forEach(alert => {
         pushWebNotification(buildAlertEmbed(alert), "Live API", false);
         if (alert.severity === "SEV1" && isAutoNotifyEnabled()) {
           void sendDiscordWebhook(
@@ -1319,6 +1404,8 @@
     function startPolling() {
       if (pollingTimer) clearInterval(pollingTimer);
       seenAlertIds = null;
+      lastLiveIncludeFp = null;
+      suppressNextAlertNotifications = false;
       const generation = ++pollingGeneration;
       fetchDashboardData(generation);
       pollingTimer = setInterval(() => fetchDashboardData(generation), 5000);
@@ -1334,6 +1421,46 @@
       if (currentMainView === "analytics") {
         renderAnalyticsDashboard();
       }
+    }
+
+    function shouldIncludeFp() {
+      return document.getElementById("includeFpToggle").checked ||
+        document.getElementById("filterVerdict").value === "FP";
+    }
+
+    function resetFpInclusion() {
+      document.getElementById("includeFpToggle").checked = false;
+      updateFpHiddenCount(null);
+    }
+
+    function refreshAlertListForFilterChange() {
+      suppressNextAlertNotifications =
+        isLiveMode && shouldIncludeFp() && lastLiveIncludeFp === false;
+      void fetchDashboardData();
+    }
+
+    function updateFpHiddenCount(count) {
+      const countEl = document.getElementById("fpHiddenCount");
+      if (count === null || shouldIncludeFp()) {
+        countEl.textContent = "";
+        countEl.classList.add("hidden");
+        return;
+      }
+      countEl.textContent = `오탐 ${count}건 숨김`;
+      countEl.classList.remove("hidden");
+    }
+
+    async function fetchAlertTotal(includeFp) {
+      const params = new URLSearchParams({ limit: "1" });
+      if (includeFp) params.set("include_fp", "1");
+      const res = await fetch(`${API_BASE}/api/alerts?${params.toString()}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const total = Number(data?.total);
+      if (data?.total === null || !Number.isFinite(total) || total < 0) {
+        throw new Error("API 응답에 유효한 total 값이 없습니다.");
+      }
+      return total;
     }
 
     function renderKPIAndChart(serverStats) {
@@ -1419,6 +1546,18 @@
       return map[sev] || map.SEV4;
     }
 
+    function getVerdictLabel(verdict) {
+      if (verdict === "UNREVIEWED") return "보류(미확정)";
+      if (verdict === "TP") return "정탐";
+      if (verdict === "FP") return "오탐";
+      return "알 수 없음";
+    }
+
+    function getActionStatusLabel(status) {
+      const labels = { ISOLATED: "격리함", GUIDE_ONLY: "안내만", NONE: "없음" };
+      return labels[status] || "상태 미확인";
+    }
+
     function renderAlertTable() {
       const catFilter = document.getElementById("filterCategory").value;
       const sevFilter = document.getElementById("filterSeverity").value;
@@ -1456,7 +1595,17 @@
           ? `<span class="ml-1 px-1.5 py-0.5 text-[10px] bg-amber-600 text-white rounded">🔒 격리됨</span>`
           : "";
         const verdict = alert.verdict || "UNREVIEWED";
-        const verdictColor = verdict === "TP" ? "text-rose-400" : verdict === "FP" ? "text-emerald-400" : "text-slate-400";
+        const verdictStyle = verdict === "TP"
+          ? "bg-rose-500/20 text-rose-300 border-rose-500/40"
+          : verdict === "FP"
+            ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
+            : "bg-slate-700 text-slate-300 border-slate-600";
+        const actionStatus = alert.action_status || "NONE";
+        const actionStyle = actionStatus === "ISOLATED"
+          ? "bg-rose-500/20 text-rose-300 border-rose-500/40"
+          : actionStatus === "GUIDE_ONLY"
+            ? "bg-sky-500/20 text-sky-300 border-sky-500/40"
+            : "bg-slate-700 text-slate-300 border-slate-600";
         const categoryText = String(alert.category || "unknown").toUpperCase();
         const timeText = String(alert.timestamp || "").slice(11, 19) || "-";
 
@@ -1471,7 +1620,10 @@
             <td class="px-3 py-3 font-mono text-slate-300 whitespace-nowrap">
               ${escapeHtml(alert.src_ip || "-")}${containedBadge} → ${escapeHtml(alert.dest_ip || "-")}:${escapeHtml(alert.dest_port ?? "-")}
             </td>
-            <td class="px-3 py-3 font-bold ${verdictColor}">${escapeHtml(verdict)}</td>
+            <td class="px-3 py-3 whitespace-nowrap">
+              <span class="inline-flex px-1.5 py-0.5 rounded border text-[10px] font-bold ${verdictStyle}">${escapeHtml(getVerdictLabel(verdict))}</span>
+              <span class="inline-flex mt-1 px-1.5 py-0.5 rounded border text-[10px] ${actionStyle}">${escapeHtml(getActionStatusLabel(actionStatus))}</span>
+            </td>
           </tr>
         `;
       }).join("");
@@ -1513,6 +1665,8 @@
 
       document.getElementById("triageVerdict").value = alert.verdict || "UNREVIEWED";
       document.getElementById("triageConfidence").value = alert.confidence || "MEDIUM";
+      document.getElementById("triageAnalyst").value = alert.analyst || "";
+      document.getElementById("triageActionStatus").value = alert.action_status || "NONE";
       document.getElementById("triageObservation").value = alert.observation || "";
       document.getElementById("triageAssessment").value = alert.assessment || "";
 
@@ -2423,36 +2577,51 @@ function renderTopology(items, selected, targetId = "topologySvgContainer") {
     // ==========================================
     document.getElementById("btnSaveTriage").addEventListener("click", async () => {
       if (selectedAlertId === null) return;
+      const alertId = selectedAlertId;
       const payload = {
         verdict: document.getElementById("triageVerdict").value,
         confidence: document.getElementById("triageConfidence").value,
+        analyst: document.getElementById("triageAnalyst").value.trim(),
+        action_status: document.getElementById("triageActionStatus").value,
         observation: document.getElementById("triageObservation").value.trim(),
         assessment: document.getElementById("triageAssessment").value.trim()
       };
 
       if (!isLiveMode) {
-        const target = MOCK_ALERTS.find(a => String(a.id) === String(selectedAlertId));
-        if (target) Object.assign(target, payload);
+        const target = MOCK_ALERTS.find(a => String(a.id) === String(alertId));
+        if (!target) {
+          const message = `Mock 경보 #${alertId}를 찾지 못해 저장하지 못했습니다.`;
+          setStatus(`🔴 ${message}`, true);
+          showTriageToast(message, true);
+          return;
+        }
+        Object.assign(target, payload);
         await fetchDashboardData();
-        const updated = alertsData.find(a => String(a.id) === String(selectedAlertId));
+        const updated = alertsData.find(a => String(a.id) === String(alertId));
         if (updated) renderDetailPanel(updated);
-        setStatus(`✅ [Mock] 경보 #${selectedAlertId} 트리아지 저장 완료`);
+        const message = `[Mock] 경보 #${alertId}의 트리아지 결과를 이 브라우저에만 저장했습니다.`;
+        setStatus(`✅ ${message}`);
+        showTriageToast(message);
         return;
       }
 
       try {
-        const res = await fetch(`${API_BASE}/api/alerts/${encodeURIComponent(selectedAlertId)}/triage`, {
+        const res = await fetch(`${API_BASE}/api/alerts/${encodeURIComponent(alertId)}/triage`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload)
         });
         if (!res.ok) throw new Error(`HTTP ${res.status} ${await res.text()}`);
-        setStatus(`✅ 경보 #${selectedAlertId} 트리아지 저장 완료`);
+        const message = `경보 #${alertId}의 트리아지 결과를 저장했습니다.`;
+        setStatus(`✅ ${message}`);
+        showTriageToast(message);
         await fetchDashboardData();
-        const updated = alertsData.find(a => String(a.id) === String(selectedAlertId));
+        const updated = alertsData.find(a => String(a.id) === String(alertId));
         if (updated) renderDetailPanel(updated);
       } catch (err) {
-        setStatus(`🔴 트리아지 저장 실패 (${err.message})`, true);
+        const message = `트리아지 저장 실패 (${err.message})`;
+        setStatus(`🔴 ${message}`, true);
+        showTriageToast(message, true);
       }
     });
 
@@ -2496,6 +2665,7 @@ function renderTopology(items, selected, targetId = "topologySvgContainer") {
       if (!isLiveMode) return;
       isLiveMode = false;
       document.getElementById("liveStatusPanel").classList.add("hidden");
+      resetFpInclusion();
       clearDetailPanel();
       document.getElementById("btnMockMode").className = "px-3 py-1 rounded-md font-semibold bg-sky-600 text-white transition";
       document.getElementById("btnLiveMode").className = "px-3 py-1 rounded-md font-semibold text-slate-400 hover:text-white transition";
@@ -2508,6 +2678,7 @@ function renderTopology(items, selected, targetId = "topologySvgContainer") {
     document.getElementById("btnLiveMode").addEventListener("click", () => {
       if (isLiveMode) return;
       isLiveMode = true;
+      resetFpInclusion();
       alertsData = [];
       clearDetailPanel();
       renderDashboardOverview();
@@ -2544,7 +2715,8 @@ function renderTopology(items, selected, targetId = "topologySvgContainer") {
         md += `| **MITRE ATT&CK** | ${a.mitre_id || "-"} |\n`;
         md += `| **출발지 → 목적지** | \`${a.src_ip || "-"}\` → \`${a.dest_ip || "-"}:${a.dest_port ?? "-"}\` |\n`;
         md += `| **HTTP 상태 / 확정위험** | ${a.http_status ?? "-"} / ${a.is_confirmed_risk ? "예 (격상됨)" : "아니오"} |\n`;
-        md += `| **판정 / 신뢰도** | **${a.verdict || "UNREVIEWED"}** (${a.confidence || "MEDIUM"}) |\n\n`;
+        md += `| **판정 / 신뢰도** | **${getVerdictLabel(a.verdict || "UNREVIEWED")}** (${a.confidence || "MEDIUM"}) |\n`;
+        md += `| **담당자 / 조치 상태** | ${a.analyst || "-"} / ${getActionStatusLabel(a.action_status || "NONE")} |\n\n`;
         md += `### 1) 관찰된 사실 (Observation / Fact)\n${a.observation || "_작성된 관찰 사실 없음_"}\n\n`;
         md += `### 2) 분석가 추정 (Assessment)\n${a.assessment || "_작성된 분석가 추정 없음_"}\n\n`;
         md += `### 3) 대응 플레이북 (수동 적용 안내)\n`;
@@ -2571,7 +2743,8 @@ function renderTopology(items, selected, targetId = "topologySvgContainer") {
 
     document.getElementById("filterCategory").addEventListener("change", renderAlertTable);
     document.getElementById("filterSeverity").addEventListener("change", renderAlertTable);
-    document.getElementById("filterVerdict").addEventListener("change", renderAlertTable);
+    document.getElementById("filterVerdict").addEventListener("change", refreshAlertListForFilterChange);
+    document.getElementById("includeFpToggle").addEventListener("change", refreshAlertListForFilterChange);
     document.getElementById("searchKeyword").addEventListener("input", renderAlertTable);
     document.getElementById("btnExportReport").addEventListener("click", exportIncidentReport);
     document.getElementById("tabBtnFlow").addEventListener("click", () => switchVizTab("flow"));
@@ -2674,7 +2847,7 @@ function renderTopology(items, selected, targetId = "topologySvgContainer") {
       const datasets = [
         { label: "정탐 (TP)", data: stats.tp, backgroundColor: "#f43f5e", borderRadius: 3 },
         { label: "오탐 (FP)", data: stats.fp, backgroundColor: "#10b981", borderRadius: 3 },
-        { label: "미검토 (UNREVIEWED)", data: stats.unreviewed, backgroundColor: "#64748b", borderRadius: 3 }
+        { label: "보류(미확정) (UNREVIEWED)", data: stats.unreviewed, backgroundColor: "#64748b", borderRadius: 3 }
       ];
       const fpTooltipCb = (tooltipItems) => {
         const row = stats.rows[tooltipItems[0]?.dataIndex];
@@ -3075,14 +3248,14 @@ function renderTopology(items, selected, targetId = "topologySvgContainer") {
         const sec = getRemainingSec(ip);
         const mm = String(Math.floor(sec / 60)).padStart(2, "0");
         const ss = String(sec % 60).padStart(2, "0");
-        badge.textContent = `🔒 격리 중 (${mm}:${ss} 남음)`;
+        badge.textContent = `시뮬레이션 · 실제 차단 아님 (${mm}:${ss} 남음)`;
         badge.className = "text-[11px] font-bold text-rose-400";
-        btn.textContent = "🔓 임시 차단 해제 (롤백)";
+        btn.textContent = "🔓 해제 시뮬레이션 (롤백)";
         btn.className = "bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-2 px-3 rounded-lg transition";
       } else {
-        badge.textContent = "격리 안 됨 (정상 통신)";
+        badge.textContent = "시뮬레이션 · 실제 차단 아님";
         badge.className = "text-[11px] text-slate-500";
-        btn.textContent = "🛡️ 출발지 IP 임시 차단 (10분)";
+        btn.textContent = "🛡️ 출발지 IP 차단 시뮬레이션 (10분)";
         btn.className = "bg-rose-600 hover:bg-rose-500 text-white font-semibold py-2 px-3 rounded-lg transition";
       }
     }
@@ -3122,7 +3295,7 @@ function renderTopology(items, selected, targetId = "topologySvgContainer") {
           { name: "카테고리 / SID", value: `${String(alert.category || "-").toUpperCase()} (${alert.sid ?? "-"})`, inline: true },
           { name: "MITRE ATT&CK", value: alert.mitre_id || "-", inline: true },
           { name: "출발지 → 목적지", value: `\`${alert.src_ip || "-"}\` → \`${alert.dest_ip || "-"}:${alert.dest_port ?? "-"}\``, inline: false },
-          { name: "판정 상태", value: alert.verdict || "UNREVIEWED", inline: true }
+          { name: "판정 상태", value: getVerdictLabel(alert.verdict || "UNREVIEWED"), inline: true }
         ],
         footer: { text: "Mini-SIEM SOC Dashboard · Human-in-the-Loop" },
         timestamp: new Date().toISOString()
@@ -3150,7 +3323,7 @@ function renderTopology(items, selected, targetId = "topologySvgContainer") {
       sessionStorage.setItem("minisiem_discord_webhook", url);
       const ok = await sendDiscordWebhook({
         title: "✅ Mini-SIEM 알림봇 연동 테스트 성공",
-        description: "실시간 고위험(SEV1) 경보 및 임시 차단 알림을 받을 준비가 완료되었습니다.",
+        description: "실시간 고위험(SEV1) 경보를 받을 준비가 완료되었습니다. 임시 대응 표시는 시뮬레이션 전용입니다.",
         color: 1096065,
         timestamp: new Date().toISOString()
       });
@@ -3174,7 +3347,7 @@ function renderTopology(items, selected, targetId = "topologySvgContainer") {
       renderNotifFeedList();
     });
 
-    document.getElementById("btnToggleContainment")?.addEventListener("click", async () => {
+    document.getElementById("btnToggleContainment")?.addEventListener("click", () => {
       const alert = alertsData.find(a => String(a.id) === String(selectedAlertId));
       if (!alert || !alert.src_ip) return;
       const ip = alert.src_ip;
@@ -3182,15 +3355,19 @@ function renderTopology(items, selected, targetId = "topologySvgContainer") {
       if (isIpContained(ip)) {
         containedIps.delete(ip);
         pushWebNotification({
-          title: `🔓 [임시 대응 해제] ${ip}`,
-          description: "분석가 승인에 따라 임시 격리가 해제(롤백)되었습니다.",
+          title: `🔓 [해제 시뮬레이션] ${ip}`,
+          description: "시뮬레이션 상태가 해제되었습니다. 실제 차단은 적용되지 않았습니다.",
           color: 1096065
-        }, "SOAR 롤백");
-        setStatus(`🔓 [임시 대응 해제] ${ip} 격리가 해제되었습니다.`);
+        }, "SOAR 시뮬레이션");
+        setStatus(`🔓 ${ip} 대응 상태를 시뮬레이션에서 해제했습니다. 실제 차단은 적용되지 않았습니다.`);
       } else {
         containedIps.set(ip, { expiresAt: Date.now() + CONT_DURATION_MS });
-        setStatus(`🛡️ [승인 기반 임시 차단] ${ip} 10분 임시 격리 적용됨 (시뮬레이션)`);
-        await sendDiscordWebhook(buildAlertEmbed(alert, "🛡️ [임시 차단 적용] 10분 격리"));
+        pushWebNotification({
+          title: `🛡️ [차단 시뮬레이션] ${ip}`,
+          description: "화면에만 임시 대응 상태를 표시했습니다. 실제 차단은 적용되지 않았습니다.",
+          color: 16098851
+        }, "SOAR 시뮬레이션");
+        setStatus(`🛡️ ${ip} 대응 상태를 10분간 시뮬레이션합니다. 실제 차단은 적용되지 않았습니다.`);
       }
       updateContainmentUI(alert);
       renderAlertTable();
