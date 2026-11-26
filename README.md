@@ -1,22 +1,42 @@
-# Mini-SIEM
+# Mini-SIEM (RookiRooki)
 
 SK쉴더스 루키즈 07기 미니프로젝트 04조가, 팀 전용 Docker 실습망에서 녹화한 패킷을 Suricata로 분석하고 웹 대시보드에서 경보를 확인하는 경량 SIEM입니다.
 
+![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white) ![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white) ![SQLite](https://img.shields.io/badge/SQLite-003B57?logo=sqlite&logoColor=white) ![Pydantic v2](https://img.shields.io/badge/Pydantic-v2-E92063?logo=pydantic&logoColor=white) ![Suricata](https://img.shields.io/badge/Suricata-8.0.8-EF3B2D) ![Docker](https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white) ![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-06B6D4?logo=tailwindcss&logoColor=white) ![Vanilla JS](https://img.shields.io/badge/Vanilla_JS-F7DF1E?logo=javascript&logoColor=black) ![Chart.js](https://img.shields.io/badge/Chart.js-FF6384?logo=chartdotjs&logoColor=white)
+
 이 문서는 GitHub 저장소 [Weo0o0/RookiRooki](https://github.com/Weo0o0/RookiRooki)의 설계·계약 문서입니다. 백엔드 핵심 코드는 main에 구현되어 있으며, 아래 실행 명령은 표준 실행 절차입니다. 시스템 배치와 탐지 흐름의 상세는 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)를, 팀 협업 규칙과 역할별 AI 프롬프트는 [ai-guides/mini_siem_ai.md](ai-guides/mini_siem_ai.md)를 참고하세요.
 
-## 팀 구성과 역할
+## 목차
 
-| 역할 | 담당 범위 | 소유 폴더·파일 |
-|---|---|---|
-| 백엔드 | FastAPI, SQLite, eve.json 파싱, 상관분석, API | `backend/` (`rules/`, `scenarios/` 파일은 읽기 전용으로 참조) |
-| 프론트엔드 | 단일 HTML SOC 대시보드 | `frontend/` |
-| 룰 | Suricata 커스텀 룰과 메타데이터 카탈로그 | `rules/custom.rules`, `rules/rule_catalog.json` |
-| 시나리오 | 실습 트래픽·pcap, 샘플 eve 로그, 대응 플레이북 | `scenarios/lab/pcaps/`, `scenarios/sample_eve.json`, `scenarios/playbooks.json` |
-| PM | 심각도·SLA 정책, 통합 스펙, QA, 발표 | `policies/sev_sla_policy.json`, `policies/PROJECT_SPEC_QA.md` |
-
-기술 스택은 고정입니다. 백엔드는 Python FastAPI + 내장 SQLite(`sqlite3`) + Pydantic v2이며, ORM이나 외부 DB로 바꾸지 않습니다. 프론트엔드는 단일 HTML + Tailwind CSS CDN + Vanilla JS(+ 필요 시 Chart.js CDN)이며, React/TypeScript/Webpack으로 바꾸지 않습니다. 백엔드 API는 `http://localhost:8000`에서 제공하고, 대시보드는 5초 주기 폴링(`GET /api/alerts`)과 Mock/Live 토글을 사용합니다.
+- [핵심 기능](#핵심-기능)
+- [탐지 시나리오](#탐지-시나리오)
+- [전체 아키텍처](#전체-아키텍처)
+- [동작 흐름 (Stage 1)](#동작-흐름-stage-1)
+- [빠른 시작](#빠른-시작)
+- [실행 방법](#실행-방법)
+- [문서 안내](#문서-안내)
+- [저장소 구조](#저장소-구조)
+- [보안 원칙](#보안-원칙)
+- [팀 구성과 역할](#팀-구성과-역할)
+- [API](#api)
+- [4일 일정](#4일-일정)
+- [심각도 SLA](#심각도-sla)
+- [추가 목표 (Stretch Goals, 시간 남으면)](#추가-목표-stretch-goals-시간-남으면)
+- [Backlog (4일 범위 밖)](#backlog-4일-범위-밖)
 
 ## 핵심 기능
+
+| 기능 | 설명 |
+|---|---|
+| HTTP 200 → SEV1 격상 | Suricata `alert`와 `http`를 연결해 SQL 인젝션·XSS·SSRF 공격 요청의 응답 코드가 `200`이면 `is_confirmed_risk=1`, 심각도 `SEV1`로 격상 |
+| `[MASKED]` 마스킹 | URL·로그의 `password`, `token`, `secret` 등 민감 값을 저장·표시 전에 `[MASKED]`로 치환 |
+| OSI 흐름·CLI 차단 안내(안내만) | `playbooks.json` 기반으로 OSI 공격 경로와 치환된 검증(`verify`)·차단(`block`)·원복(`rollback`) CLI 명령을 안내(안내만 제공, 호스트 방화벽 미실행) |
+| PCAP 룰 검사·MITRE 커버리지 | 업로드한 PCAP을 `suricata -r`과 `rules/custom.rules`로 검사하고 `GET /api/stats`로 심각도 집계·MITRE ATT&CK 커버리지·Blind 룰 표시 |
+| 트리아지(TP/FP/UNREVIEWED, 오탐 숨김) | 관찰된 사실(`observation`)과 추정(`assessment`), 신뢰도, 판정(`TP`/`FP`/`UNREVIEWED`)을 저장하고 기본 목록·통계에서 오탐(`FP`) 숨김 지원 |
+| Discord 알림(SEV1 자동·수동, 격리 확인 링크) | SEV1 경보 자동·수동 Discord 알림 발송 및 토큰 조건 충족 시 격리 확인 페이지(`isolate.html`) 링크 포함 |
+| 승인 기반 격리(기본 꺼짐) | `ISOLATION_ENABLED=1`일 때만 실습망 `attacker`(`172.28.0.100`) 한 대를 분석가의 수동 승인(1회용 토큰)으로만 네트워크에서 분리·해제 |
+
+### 핵심 기능 상세
 
 4일 범위에서 구현·시연하는 차별화는 다음 네 가지입니다.
 
@@ -29,7 +49,7 @@ SK쉴더스 루키즈 07기 미니프로젝트 04조가, 팀 전용 Docker 실�
 4. **업로드한 PCAP을 커스텀 룰로 검사하고 MITRE 커버리지를 보여 줌**  
    웹에서 pcap을 올리면 백엔드가 `suricata -r`과 `rules/custom.rules`로 오프라인 분석합니다. 대시보드는 `GET /api/stats`로 심각도 집계와 MITRE ATT&CK 커버리지를 표시합니다.
 
-## 공격 시나리오
+## 탐지 시나리오
 
 Stage 1에서 다루는 시나리오는 **확정 6종**입니다. MITRE 기법 ID는 초안이며, **룰 담당자가 카탈로그를 확정할 때 검증**합니다.
 
@@ -45,6 +65,19 @@ Stage 1에서 다루는 시나리오는 **확정 6종**입니다. MITRE 기법 I
 실습망 주소는 팀이 쓰는 격리 Docker 네트워크만 사용합니다. `mini-siem-net`는 `172.28.0.0/24`, 공격자 `172.28.0.100`, 웹 타깃 `172.28.0.10`, SSH 타깃 `172.28.0.11`입니다. 백엔드와 프론트엔드는 호스트에서 실행하고, API는 8000 포트를 사용합니다.
 
 플레이북 최상위 키, `rule_catalog.json`의 `category`·`sid`, `sample_eve.json`의 `signature_id`는 서로 철자까지 같아야 합니다. SID 대역 `1000001`–`1000999`, 치환 변수, 심각도 `SEV1`–`SEV4`는 그대로입니다.
+
+## 전체 아키텍처
+
+```mermaid
+flowchart LR
+  Attacker["공격자 (attacker 172.28.0.100)"] --> Bridge["실습망 브리지 br-minisiem (172.28.0.0/24)"]
+  Bridge --> Suricata["Suricata (rules/custom.rules)"]
+  Suricata --> Eve["eve.json"]
+  Eve --> Backend["FastAPI (:8000) + SQLite"]
+  Backend --> Dashboard["대시보드 (:5500)"]
+  Dashboard --> Discord["Discord 알림 / 격리 확인 페이지 (isolate.html)"]
+  Discord -->|"POST /api/isolate (승인 시)"| Backend
+```
 
 ## 동작 흐름 (Stage 1)
 
@@ -66,6 +99,161 @@ flowchart LR
   Db --> Api["FastAPI :8000"]
   Api --> Ui["대시보드"]
 ```
+
+## 빠른 시작
+
+1. **설치 및 환경 구축**: [docs/설치_테스트_가이드.md](docs/설치_테스트_가이드.md)를 따라 WSL2 Ubuntu, Python `.venv`, Suricata, Docker 환경을 설치합니다.
+2. **설치 확인**: `python -m pytest backend/tests -q`(`59 passed`), 백엔드(`uvicorn backend.main:app --port 8000`, `:8000`), 프론트엔드(`python3 -m http.server 5500`, `:5500`) 실행을 확인합니다.
+3. **전체 기능 체험**: [docs/RookiRooki_전체기능_체험_종합명령어.md](docs/RookiRooki_전체기능_체험_종합명령어.md) 순서대로 Mock 모드, PCAP 업로드, 6종 라이브 탐지, 트리아지, Discord 알림 및 승인 기반 격리를 체험합니다.
+
+## 실행 방법
+
+자세한 설치·테스트 절차는 [docs/설치_테스트_가이드.md](docs/설치_테스트_가이드.md) 참고
+
+아래는 표준 실행 절차입니다. 백엔드는 이미 구현되어 로컬에서 바로 실행할 수 있습니다.
+
+1. **실습망과 녹화 (시나리오 담당, 격리망 전용)**  
+   팀 Docker 실습망(`mini-siem-net`)을 띄운 뒤, **Docker 브리지 인터페이스**에서 `victim-web`과 `victim-pc` 트래픽이 모두 보이도록 tcpdump로 pcap을 남깁니다. 브리지 이름은 환경마다 다르므로 `docker network inspect`로 확인합니다.
+   ```bash
+   sudo tcpdump -i <브리지_인터페이스> -w scenarios/lab/pcaps/lab_capture.pcap
+   ```
+2. **오프라인 룰 검사 (룰·백엔드 점검용)**  
+   ```bash
+   mkdir -p /tmp/suricata_out
+   suricata -r scenarios/lab/pcaps/lab_capture.pcap -S rules/custom.rules -l /tmp/suricata_out -k none --runmode single
+   ```
+3. **백엔드**  
+   ```bash
+   pip install -r backend/requirements.txt
+   uvicorn backend.main:app --reload --port 8000
+   ```
+   API 문서는 `http://localhost:8000/docs`에서 확인합니다. 샘플 로그는 `POST /api/ingest/sample`, 녹화 파일은 `POST /api/pcap/upload`로 넣습니다.
+4. **대시보드**  
+   `cd frontend && python3 -m http.server 5500`으로 서버를 띄우고 `http://localhost:5500`에 접속합니다(`ALLOWED_ORIGINS` 때문에 `file://`로 열면 CORS 오류가 납니다). 백엔드가 준비되면 Mock 모드를 끄고 Live API(`http://localhost:8000`)에 연결합니다.
+
+## 문서 안내
+
+| 문서 | 용도 |
+|---|---|
+| [docs/설치_테스트_가이드.md](docs/설치_테스트_가이드.md) | Mini-SIEM 설치 및 테스트 가이드 (Windows 11 + WSL2 Ubuntu + Docker + Suricata + Python 환경 설치·검증) |
+| [docs/RookiRooki_전체기능_체험_종합명령어.md](docs/RookiRooki_전체기능_체험_종합명령어.md) | RookiRooki 미니 SIEM 전체 기능 체험 종합 명령어 (순서대로 붙여 넣어 전체 기능을 화면으로 확인하는 실습 안내) |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Mini-SIEM 시스템 구상도 (구성 요소, 실습망, 데이터 흐름, 탐지 규칙, 데이터 저장 구조 정리) |
+| [docs/live_capture_guide.md](docs/live_capture_guide.md) | 라이브 캡처 ingest 가이드 (선택 기능, 기본 꺼짐, 팀 합의 후 사용) |
+| [docs/playbooks_guide.md](docs/playbooks_guide.md) | `scenarios/playbooks.json` v2 기술 명세서 및 6종 공격 카테고리 관제 플레이북 1줄 1주석 해설 |
+| [docs/sample_eve_guide.md](docs/sample_eve_guide.md) | `scenarios/sample_eve.json` v2 기술 명세서 및 6종 공격 카테고리 세션별 주석 해설 |
+| [docs/isolation_demo_script.md](docs/isolation_demo_script.md) | 격리·트리아지 시연 대본 |
+| [docs/isolation_rehearsal_log.md](docs/isolation_rehearsal_log.md) | 격리·트리아지 리허설 기록표 |
+| [backend/README.md](backend/README.md) | 백엔드 실행(`uvicorn`)·테스트(`pytest`) 명령, 엔드포인트 목록 및 승인 기반 격리(`ISOLATION_ENABLED=1`) 안내 |
+| [frontend/README.md](frontend/README.md) | 프론트엔드 폴더 안내 (단일 `index.html` 기반 HTML + Tailwind CDN + Vanilla JS 구성) |
+| [rules/isolation_criteria.md](rules/isolation_criteria.md) | 격리 판단 기준표 (격리 API 및 확인 페이지 실제 동작과 격리 기준 정리) |
+| [rules/triage_templates.md](rules/triage_templates.md) | 트리아지 오탐(FP) 근거와 메모 템플릿 (웹 경보 상세의 관찰된 사실·분석가 추정 작성 템플릿) |
+| [scenarios/lab/WSL2_Docker_환경구축_종합명령어.md](scenarios/lab/WSL2_Docker_환경구축_종합명령어.md) | WSL2 Ubuntu Docker 환경 구축 종합 명령어 (`systemd` 활성화 및 Docker Engine 설치 참고 문서) |
+
+## 저장소 구조
+
+```text
+mini-siem/
+├── backend/                                      # 백엔드 (FastAPI, SQLite, 파서)
+│   ├── .gitignore
+│   ├── README.md
+│   ├── __init__.py
+│   ├── main.py
+│   ├── eve_parser.py
+│   ├── isolation.py                              # 선택 기능: 승인 기반 컨테이너 격리 (기본 꺼짐)
+│   ├── live_capture.py                           # 선택 기능: 라이브 eve.json 폴링 (기본 꺼짐)
+│   ├── requirements.txt
+│   └── tests/
+│       ├── fixtures/
+│       │   ├── playbooks.json
+│       │   ├── rule_catalog.json
+│       │   ├── sample_eve.json
+│       │   └── test_custom.rules
+│       ├── test_alerts_and_sample.py
+│       ├── test_api.py
+│       ├── test_eve_parser.py
+│       ├── test_isolation.py
+│       ├── test_live_capture.py
+│       └── test_triage_fields.py
+├── frontend/                                     # 프론트엔드 (단일 HTML SOC 대시보드 및 격리 확인 페이지)
+│   ├── README.md
+│   ├── index.html
+│   ├── isolate.html
+│   └── mock_demo_data.js
+├── rules/                                        # Suricata 커스텀 룰, 카탈로그 및 판단 기준
+│   ├── custom.rules
+│   ├── isolation_criteria.md
+│   ├── rule_catalog.json
+│   └── triage_templates.md
+├── scenarios/                                    # 시나리오 및 실습 환경
+│   ├── lab/                                      # Docker 실습망 구성
+│   │   ├── WSL2_Docker_환경구축_종합명령어.md
+│   │   ├── docker-compose.yml
+│   │   ├── attacker/
+│   │   │   ├── Dockerfile
+│   │   │   ├── lab-traffic.sh
+│   │   │   └── passwords.txt
+│   │   ├── pcaps/                                # 실습 녹화 pcap 저장 위치
+│   │   ├── victim-pc/
+│   │   │   └── Dockerfile
+│   │   └── victim-web/
+│   │       ├── Dockerfile
+│   │       └── app.py
+│   ├── playbooks.json                            # 시나리오별 대응 플레이북
+│   └── sample_eve.json                           # 데모용 샘플 eve 로그
+├── policies/                                     # 정책 및 QA (PM 소유)
+│   └── README.md                                 # sev_sla_policy.json, PROJECT_SPEC_QA.md 작성 예정 안내
+├── docs/                                         # 설계, 설치 및 전체 기능 체험 가이드
+│   ├── ARCHITECTURE.md
+│   ├── RookiRooki_전체기능_체험_종합명령어.md
+│   ├── isolation_demo_script.md
+│   ├── isolation_rehearsal_log.md
+│   ├── live_capture_guide.md
+│   ├── playbooks_guide.md
+│   ├── sample_eve_guide.md
+│   └── 설치_테스트_가이드.md
+├── ai-guides/                                    # 역할별 AI 프롬프트 및 가이드
+│   ├── 01_백엔드_AI룰.md
+│   ├── 02_프론트엔드_AI룰.md
+│   ├── 03_시나리오_AI룰.md
+│   ├── 04_룰_AI룰.md
+│   ├── 05_PM_AI룰.md
+│   ├── 06_문서_PPT_AI룰.md
+│   └── mini_siem_ai.md
+└── README.md
+```
+
+## 보안 원칙
+
+- **격리 실습망(`172.28.0.0/24`) 전용**: 공격 재현과 패킷 수집은 팀의 격리된 Docker 실습망(`mini-siem-net`, `172.28.0.0/24`)에서만 수행하며, 학교·회사·가정 네트워크나 외부 대상에는 사용하지 않습니다.
+- **차단 명령 안내 전용 및 승인 기반 격리**: 차단 CLI 명령은 안내만 하며 호스트 방화벽을 실행하지 않습니다. 컨테이너 격리는 기본 꺼짐(`ISOLATION_ENABLED=1`일 때만 동작)이고, 분석가가 승인했을 때만 실습망 `attacker`(`172.28.0.100`) 한 대에 한해 실행됩니다.
+- **민감 정보·원본 산출물 커밋 금지**: 원본 `pcap`, 라이브/분석 `eve.json`, 실제 웹훅 URL, 격리 토큰, 실제 비밀번호·개인정보는 코드나 저장소에 절대 커밋하지 않습니다.
+
+### 보안 기본기
+
+- 비밀번호, API 키, 웹훅 주소는 코드에 직접 적지 않고 환경변수로 분리합니다.
+- SQLite는 파라미터 바인딩(`?`)만 쓰고, 문자열을 이어 붙여 쿼리하지 않습니다.
+- CORS는 `*`가 아니라 로컬 주소 목록만 허용합니다. 요청 본문은 Pydantic으로 검증하고, 에러 응답에 스택 트레이스를 넣지 않습니다.
+- 프론트엔드는 서버에서 받은 문자열을 `innerHTML`에 넣기 전에 이스케이프합니다.
+- 차단 CLI는 반드시 검증·원복 명령과 세트로 적습니다. 관제 메모는 사실(`observation`)과 추정(`assessment`), 신뢰도를 나눕니다.
+
+### 안전과 윤리
+
+- 공격 재현과 패킷 수집은 **이 팀의 격리된 Docker 실습망에서만** 합니다. 학교·회사·가정 네트워크나 허가 없는 대상을 쓰지 않습니다.
+- 샘플 로그와 pcap에는 실제 계정, 실제 비밀번호, 실제 개인정보를 넣지 않습니다. 마스킹 시험에는 가짜 `password=` / `token=`만 사용합니다.
+- 문서에 적힌 차단 명령은 안내입니다. 실습망 밖 장비에 적용하지 않습니다. 격리 기능의 대상은 `172.28.0.100`의 `attacker` 컨테이너뿐이며 허용 목록 밖의 IP는 거절됩니다.
+- 샘플 출발지·문서 예시가 필요하면 RFC 5737 문서용 대역(`192.0.2.0/24`, `198.51.100.0/24`, `203.0.113.0/24`)만 쓰고, 실공인 IP는 사용하지 않습니다.
+
+## 팀 구성과 역할
+
+| 역할 | 담당 범위 | 소유 폴더·파일 |
+|---|---|---|
+| 백엔드 | FastAPI, SQLite, eve.json 파싱, 상관분석, API | `backend/` (`rules/`, `scenarios/` 파일은 읽기 전용으로 참조) |
+| 프론트엔드 | 단일 HTML SOC 대시보드 | `frontend/` |
+| 룰 | Suricata 커스텀 룰과 메타데이터 카탈로그 | `rules/custom.rules`, `rules/rule_catalog.json` |
+| 시나리오 | 실습 트래픽·pcap, 샘플 eve 로그, 대응 플레이북 | `scenarios/lab/pcaps/`, `scenarios/sample_eve.json`, `scenarios/playbooks.json` |
+| PM | 심각도·SLA 정책, 통합 스펙, QA, 발표 | `policies/sev_sla_policy.json`, `policies/PROJECT_SPEC_QA.md` |
+
+기술 스택은 고정입니다. 백엔드는 Python FastAPI + 내장 SQLite(`sqlite3`) + Pydantic v2이며, ORM이나 외부 DB로 바꾸지 않습니다. 프론트엔드는 단일 HTML + Tailwind CSS CDN + Vanilla JS(+ 필요 시 Chart.js CDN)이며, React/TypeScript/Webpack으로 바꾸지 않습니다. 백엔드 API는 `http://localhost:8000`에서 제공하고, 대시보드는 5초 주기 폴링(`GET /api/alerts`)과 Mock/Live 토글을 사용합니다.
 
 ## API
 
@@ -109,67 +297,6 @@ Backlog의 Stage 2 항목을 **선택 기능**으로 미리 구현해 둔 것입
 - **수동 승인 전용:** 확인 페이지는 열기만 해서는 절대 격리하지 않으며(GET 조회만 수행), 화면에서 `[승인(격리 실행)]` 버튼을 눌렀을 때만 `POST /api/isolate`를 호출합니다.
 - **접속 방법 및 주의:** `frontend/`에서 `python3 -m http.server 5500`을 실행해 `http://localhost:5500`으로 열어야 하며, `localhost` 링크는 백엔드가 실행 중인 같은 PC의 브라우저에서만 동작합니다.
 
-## 저장소 구조
-
-```text
-mini-siem/
-├── backend/                      # 백엔드 (FastAPI, SQLite, 파서)
-│   ├── main.py
-│   ├── eve_parser.py
-│   ├── live_capture.py           # 선택 기능: 라이브 eve.json 폴링 (기본 꺼짐)
-│   ├── requirements.txt
-│   └── tests/
-├── frontend/                     # 프론트엔드 (단일 HTML SOC 대시보드)
-│   ├── index.html
-│   └── README.md
-├── rules/                        # Suricata 커스텀 룰 및 카탈로그
-│   ├── custom.rules
-│   └── rule_catalog.json
-├── scenarios/                    # 시나리오 및 실습 환경
-│   ├── lab/                      # Docker 실습망 구성
-│   │   ├── docker-compose.yml
-│   │   └── pcaps/                # 실습 녹화 pcap 저장 위치
-│   ├── sample_eve.json           # 데모용 샘플 eve 로그
-│   └── playbooks.json            # 시나리오별 대응 플레이북
-├── policies/                     # 정책 및 QA (PM 소유)
-│   └── README.md                 # sev_sla_policy.json, PROJECT_SPEC_QA.md 작성 예정 안내
-├── docs/                         # 설계 및 연동 가이드
-│   ├── ARCHITECTURE.md
-│   ├── sample_eve_guide.md
-│   ├── playbooks_guide.md
-│   ├── live_capture_guide.md
-│   └── 설치_테스트_가이드.md
-├── ai-guides/                    # 역할별 AI 프롬프트 및 가이드
-│   ├── mini_siem_ai.md
-│   └── ...
-└── README.md
-```
-
-## 실행 방법
-
-자세한 설치·테스트 절차는 [docs/설치_테스트_가이드.md](docs/설치_테스트_가이드.md) 참고
-
-아래는 표준 실행 절차입니다. 백엔드는 이미 구현되어 로컬에서 바로 실행할 수 있습니다.
-
-1. **실습망과 녹화 (시나리오 담당, 격리망 전용)**  
-   팀 Docker 실습망(`mini-siem-net`)을 띄운 뒤, **Docker 브리지 인터페이스**에서 `victim-web`과 `victim-pc` 트래픽이 모두 보이도록 tcpdump로 pcap을 남깁니다. 브리지 이름은 환경마다 다르므로 `docker network inspect`로 확인합니다.
-   ```bash
-   sudo tcpdump -i <브리지_인터페이스> -w scenarios/lab/pcaps/lab_capture.pcap
-   ```
-2. **오프라인 룰 검사 (룰·백엔드 점검용)**  
-   ```bash
-   mkdir -p /tmp/suricata_out
-   suricata -r scenarios/lab/pcaps/lab_capture.pcap -S rules/custom.rules -l /tmp/suricata_out -k none --runmode single
-   ```
-3. **백엔드**  
-   ```bash
-   pip install -r backend/requirements.txt
-   uvicorn backend.main:app --reload --port 8000
-   ```
-   API 문서는 `http://localhost:8000/docs`에서 확인합니다. 샘플 로그는 `POST /api/ingest/sample`, 녹화 파일은 `POST /api/pcap/upload`로 넣습니다.
-4. **대시보드**  
-   `cd frontend && python3 -m http.server 5500`으로 서버를 띄우고 `http://localhost:5500`에 접속합니다(`ALLOWED_ORIGINS` 때문에 `file://`로 열면 CORS 오류가 납니다). 백엔드가 준비되면 Mock 모드를 끄고 Live API(`http://localhost:8000`)에 연결합니다.
-
 ## 4일 일정
 
 Day 3 **오후 6시 Feature Freeze** 이후에는 새 기능을 넣지 않고, 버그 수정과 시연 준비만 합니다.
@@ -194,30 +321,15 @@ PM이 `policies/sev_sla_policy.json`으로 관리합니다. 초안 기준은 다
 
 자동 격상: SQL 인젝션·XSS·SSRF에서 **그 요청의 응답이 200**이면 즉시 SEV1. 평문 패스워드·토큰이 보이면 마스킹하고, 정책상 최소 SEV2 이상을 검토합니다. SEV1 선언 후 30분 안에 원인을 못 찾으면 상위 보고를 검토합니다.
 
-## 보안 기본기
-
-- 비밀번호, API 키, 웹훅 주소는 코드에 직접 적지 않고 환경변수로 분리합니다.
-- SQLite는 파라미터 바인딩(`?`)만 쓰고, 문자열을 이어 붙여 쿼리하지 않습니다.
-- CORS는 `*`가 아니라 로컬 주소 목록만 허용합니다. 요청 본문은 Pydantic으로 검증하고, 에러 응답에 스택 트레이스를 넣지 않습니다.
-- 프론트엔드는 서버에서 받은 문자열을 `innerHTML`에 넣기 전에 이스케이프합니다.
-- 차단 CLI는 반드시 검증·원복 명령과 세트로 적습니다. 관제 메모는 사실(`observation`)과 추정(`assessment`), 신뢰도를 나눕니다.
-
-## 안전과 윤리
-
-- 공격 재현과 패킷 수집은 **이 팀의 격리된 Docker 실습망에서만** 합니다. 학교·회사·가정 네트워크나 허가 없는 대상을 쓰지 않습니다.
-- 샘플 로그와 pcap에는 실제 계정, 실제 비밀번호, 실제 개인정보를 넣지 않습니다. 마스킹 시험에는 가짜 `password=` / `token=`만 사용합니다.
-- 문서에 적힌 차단 명령은 안내입니다. 실습망 밖 장비에 적용하지 않습니다. 격리 기능의 대상은 `172.28.0.100`의 `attacker` 컨테이너뿐이며 허용 목록 밖의 IP는 거절됩니다.
-- 샘플 출발지·문서 예시가 필요하면 RFC 5737 문서용 대역(`192.0.2.0/24`, `198.51.100.0/24`, `203.0.113.0/24`)만 쓰고, 실공인 IP는 사용하지 않습니다.
-
 ## 추가 목표 (Stretch Goals, 시간 남으면)
 
 아래 네 가지는 발표 차별화(위 [핵심 기능](#핵심-기능) 4개)를 **대체하지 않습니다.** 기본 기능이 끝난 뒤에만 착수하고, **Day 3 18:00 기능 동결 전까지만** 넣습니다. 동결 이후이거나 시간이 없으면 Backlog로 남깁니다.
 
 여기에 적힌 API와 테이블은 **추가 목표 — 기본 계약 아님**입니다. Stage 1 기본 계약은 위의 [API](#api)와 `alerts` 테이블입니다.
 
-권장 착수 순서는 **④ 분석 명령어 해설 → ③ 스토리 → ② 오탐 버튼 → ① 알림봇**입니다. ④는 기존 플레이북 화면을 확장하면 되어 공수가 가장 작고, ③은 같은 출발지 IP만 묶어도 시연 효과가 큽니다. ②는 새 테이블과 가드레일이 필요하고, ①은 외부 웹훅과 환경 설정까지 연동이 큽니다.
+권장 착수 순서는 **④ 분석 명령어 해설 → ③ 스토리 → ② 오탐 버튼 → ① 알림 기능**입니다. ④는 기존 플레이북 화면을 확장하면 되어 공수가 가장 작고, ③은 같은 출발지 IP만 묶어도 시연 효과가 큽니다. ②는 새 테이블과 가드레일이 필요하고, ①은 외부 웹훅과 환경 설정까지 연동이 큽니다.
 
-### 1. 알림봇 (위협 감지 알림 · 웹 연동 · 임시 대응)
+### 1. 알림 기능 (위협 감지 알림 · 웹 연동 · 임시 대응)
 
 **목적.** 프롬프트나 대시보드를 계속 보지 않아도, 새 위협을 메신저로 받고 웹 경보 화면으로 바로 이동하며, 임시 대응 안내를 확인합니다.
 
