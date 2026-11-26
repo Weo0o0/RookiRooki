@@ -24,6 +24,8 @@ EXPECTED_ALERT_KEYS = [
     "observation",
     "assessment",
     "confidence",
+    "analyst",
+    "action_status",
     "playbook",
 ]
 
