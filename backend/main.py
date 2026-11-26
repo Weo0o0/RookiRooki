@@ -424,23 +424,25 @@ def get_alerts(
     severity: Optional[str] = Query(None, pattern=r"^(SEV1|SEV2|SEV3|SEV4)$"),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
+    include_fp: int = Query(0, ge=0, le=1),
 ):
     init_db()
     playbooks = load_playbooks()
+    conditions: List[str] = []
+    params: List[Any] = []
+    if severity is not None:
+        conditions.append("severity = ?")
+        params.append(severity)
+    if not include_fp:
+        conditions.append(FP_EXCLUDE_SQL)
+    where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
     with closing(sqlite3.connect(db_path())) as db:
         db.row_factory = sqlite3.Row
-        if severity is not None:
-            total = db.execute("SELECT COUNT(*) FROM alerts WHERE severity = ?", (severity,)).fetchone()[0]
-            rows = db.execute(
-                "SELECT * FROM alerts WHERE severity = ? ORDER BY id DESC LIMIT ? OFFSET ?",
-                (severity, limit, offset),
-            ).fetchall()
-        else:
-            total = db.execute("SELECT COUNT(*) FROM alerts").fetchone()[0]
-            rows = db.execute(
-                "SELECT * FROM alerts ORDER BY id DESC LIMIT ? OFFSET ?",
-                (limit, offset),
-            ).fetchall()
+        total = db.execute(f"SELECT COUNT(*) FROM alerts {where}", params).fetchone()[0]
+        rows = db.execute(
+            f"SELECT * FROM alerts {where} ORDER BY id DESC LIMIT ? OFFSET ?",
+            (*params, limit, offset),
+        ).fetchall()
 
     items = [build_alert_dict(row, playbooks) for row in rows]
     return {
@@ -514,13 +516,15 @@ def live_status():
     return live_capture.status()
 
 @app.get("/api/stats", response_model=StatsResult)
-def stats():
+def stats(include_fp: int = Query(0, ge=0, le=1)):
     init_db()
+    where = "" if include_fp else f"WHERE {FP_EXCLUDE_SQL}"
+    mitre_where = "WHERE mitre_id IS NOT NULL" + ("" if include_fp else f" AND {FP_EXCLUDE_SQL}")
     with closing(sqlite3.connect(db_path())) as db:
-        total = db.execute("SELECT COUNT(*) FROM alerts").fetchone()[0]
-        severity = dict(db.execute("SELECT severity, COUNT(*) FROM alerts GROUP BY severity").fetchall())
-        category = dict(db.execute("SELECT category, COUNT(*) FROM alerts GROUP BY category").fetchall())
-        mitre = [row[0] for row in db.execute("SELECT DISTINCT mitre_id FROM alerts WHERE mitre_id IS NOT NULL ORDER BY mitre_id").fetchall()]
+        total = db.execute(f"SELECT COUNT(*) FROM alerts {where}").fetchone()[0]
+        severity = dict(db.execute(f"SELECT severity, COUNT(*) FROM alerts {where} GROUP BY severity").fetchall())
+        category = dict(db.execute(f"SELECT category, COUNT(*) FROM alerts {where} GROUP BY category").fetchall())
+        mitre = [row[0] for row in db.execute(f"SELECT DISTINCT mitre_id FROM alerts {mitre_where} ORDER BY mitre_id").fetchall()]
 
         ingest_sources_rows = db.execute("SELECT source FROM ingest_sources").fetchall()
         present_sources = {row[0] for row in ingest_sources_rows}
