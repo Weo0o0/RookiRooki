@@ -148,9 +148,13 @@ CREATE TABLE IF NOT EXISTS alerts (
     verdict TEXT DEFAULT 'UNREVIEWED',
     observation TEXT DEFAULT '',
     assessment TEXT DEFAULT '',
-    confidence TEXT DEFAULT 'MEDIUM'
+    confidence TEXT DEFAULT 'MEDIUM',
+    analyst TEXT DEFAULT '',
+    action_status TEXT DEFAULT 'NONE'
 );
 ```
+
+옛 DB는 서버 시작 시 `ALTER TABLE ... ADD COLUMN`으로 자동 보정됩니다(멱등).
 
 | 컬럼 | 설명 |
 |---|---|
@@ -161,9 +165,11 @@ CREATE TABLE IF NOT EXISTS alerts (
 | `is_confirmed_risk` | 해당 웹 요청의 응답이 200이면 1 |
 | `pii_masked` | 마스킹이 발생하면 1 |
 | `raw_url` | 마스킹 이후 URL. SSH·스캔은 비울 수 있음 |
-| `verdict` | `TP`, `FP`, `UNREVIEWED` |
+| `verdict` | `TP`, `FP`, `UNREVIEWED` (`UNREVIEWED`의 화면 표시명은 보류) |
 | `observation` / `assessment` | 사실 / 추정. 섞어 쓰지 않음 |
 | `confidence` | `HIGH`, `MEDIUM`, `LOW` |
+| `analyst` | 담당자 이름, 최대 50자 |
+| `action_status` | `ISOLATED`, `GUIDE_ONLY`, `NONE` |
 
 `rule_catalog.json` 항목 키는 `sid`, `category`, `title`, `status`, `mitre_tactic`, `mitre_id`, `base_severity`, `escalated_severity`, `data_sources`, `false_positives`, `validation_pcap`, `notes`를 유지합니다. `playbooks.json`의 최상위 키는 여섯 카테고리와 같고, 각 항목에 OSI 설명, 흐름, `preserve_evidence_first`, 장비별 `verify` / `block` / `rollback`을 둡니다. 주소와 포트는 `{{SRC_IP}}`, `{{DEST_IP}}`, `{{DEST_PORT}}`만 사용합니다.
 

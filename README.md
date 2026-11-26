@@ -74,14 +74,14 @@ Stage 1에서 프론트·백엔드가 맞출 인터페이스입니다. 앞의 �
 | 메서드 | 경로 | 용도 | 입력 | 응답 요지 |
 |---|---|---|---|---|
 | `POST` | `/api/ingest/sample` | 데모용 `scenarios/sample_eve.json` 적재 | 없음 | 적재된 경보 건수 |
-| `GET` | `/api/alerts` | 경보 목록 | `severity`, `limit`, `offset` | `items`, 페이지 건수 |
+| `GET` | `/api/alerts` | 경보 목록 | `severity`, `limit`, `offset`, `include_fp`(`0`/`1`, 기본 `0` = 오탐(FP) 제외) | `items`, 페이지 건수(`total`도 같은 기준) |
 | `GET` | `/api/alerts/{id}` | 경보 상세 + 플레이북 | 경로 `id` | 경보 필드 + `playbook` |
-| `PATCH` | `/api/alerts/{id}/triage` | 분석가 판정 저장 | `verdict`(`TP`/`FP`/`UNREVIEWED`), `observation`, `assessment`, `confidence`(`HIGH`/`MEDIUM`/`LOW`) | 갱신 결과 |
+| `PATCH` | `/api/alerts/{id}/triage` | 분석가 판정 저장 | `verdict`(`TP`/`FP`/`UNREVIEWED`), `observation`, `assessment`, `confidence`(`HIGH`/`MEDIUM`/`LOW`), `analyst`(문자열, 최대 50자), `action_status`(`ISOLATED`/`GUIDE_ONLY`/`NONE`, 기본 `NONE`) | 갱신 결과 |
 | `POST` | `/api/pcap/upload` | pcap 업로드 후 `suricata -r` | `multipart/form-data`, `.pcap` 또는 `.pcapng`, 최대 20MB | 분석 요약(적재 건수 등) |
-| `GET` | `/api/stats` | 심각도 집계, MITRE 커버리지, 로그 단절(Blind) 룰 | 없음 | `severity_counts`, `mitre_coverage`, `blind_rules` 등 |
+| `GET` | `/api/stats` | 심각도 집계, MITRE 커버리지, 로그 단절(Blind) 룰 | `include_fp`(`0`/`1`, 기본 `0`) | `severity_counts`, `mitre_coverage`, `blind_rules` 등 (집계도 기본은 FP 제외) |
 | `GET` | `/api/live/status` | (선택 기능, 기본 꺼짐) 라이브 캡처 상태·시작/중지 안내 | 없음 | `enabled`, `eve_path`, `offset`, `last_poll_at`, `rows_stored`, `rows_skipped_out_of_scope`, `last_error`, `start_command`, `stop_command` |
 
-경보 JSON의 핵심 키는 `id`, `timestamp`, `sid`, `category`, `signature`, `mitre_id`, `src_ip`, `dest_ip`, `dest_port`, `http_status`, `severity`, `is_confirmed_risk`, `pii_masked`, `raw_url`, `verdict`, `observation`, `assessment`, `confidence`, `playbook`입니다. 스키마 상세는 [ARCHITECTURE.md](docs/ARCHITECTURE.md)를 참고하세요.
+경보 JSON의 핵심 키는 `id`, `timestamp`, `sid`, `category`, `signature`, `mitre_id`, `src_ip`, `dest_ip`, `dest_port`, `http_status`, `severity`, `is_confirmed_risk`, `pii_masked`, `raw_url`, `verdict`, `observation`, `assessment`, `confidence`, `analyst`, `action_status`, `playbook`입니다. 스키마 상세는 [ARCHITECTURE.md](docs/ARCHITECTURE.md)를 참고하세요.
 
 ### 선택 기능: 라이브 캡처 ingest (기본 꺼짐, 팀 합의 후 사용)
 
