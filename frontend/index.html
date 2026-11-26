@@ -1363,36 +1363,56 @@
 
     // Live 폴링 신규 경보: 첫 응답은 기존 경보 기준선으로만 처리
     let seenAlertIds = null;
+    let sev1NotifiedIds = new Set();
     let lastLiveIncludeFp = null;
 
     function notifyNewAlerts(list, suppressNew = false) {
       const ids = list.map(a => String(a.id));
       if (seenAlertIds === null) {
         seenAlertIds = new Set(ids);
+        sev1NotifiedIds = new Set(list.filter(a => a.severity === "SEV1").map(a => String(a.id)));
         return;
       }
       const fresh = list.filter(a => !seenAlertIds.has(String(a.id)));
+      const sev1Pending = list.filter(a => a.severity === "SEV1" && !sev1NotifiedIds.has(String(a.id)));
       ids.forEach(id => seenAlertIds.add(id));
+      sev1Pending.forEach(a => sev1NotifiedIds.add(String(a.id)));
       const reportableFresh = suppressNew
         ? fresh.filter(alert => (alert.verdict || "UNREVIEWED") !== "FP")
         : fresh;
-      if (!reportableFresh.length) return;
+      const reportableSev1 = suppressNew
+        ? sev1Pending.filter(alert => (alert.verdict || "UNREVIEWED") !== "FP")
+        : sev1Pending;
 
-      showAlertToast(reportableFresh);
-      reportableFresh.forEach(alert => {
-        pushWebNotification(buildAlertEmbed(alert), "Live API", false);
-        if (alert.severity === "SEV1" && isAutoNotifyEnabled()) {
+      if (reportableFresh.length) {
+        showAlertToast(reportableFresh);
+        reportableFresh.forEach(alert => {
+          pushWebNotification(buildAlertEmbed(alert), "Live API", false);
+        });
+      }
+
+      const freshIds = new Set(fresh.map(a => String(a.id)));
+      const escalated = reportableSev1.filter(a => !freshIds.has(String(a.id)));
+      if (escalated.length) {
+        showAlertToast(escalated, "SEV1 격상");
+        escalated.forEach(alert => {
+          pushWebNotification(buildAlertEmbed(alert, "🚨 [SEV1 격상] 고위험 경보"), "Live API", false);
+        });
+      }
+
+      if (isAutoNotifyEnabled()) {
+        reportableSev1.forEach(alert => {
           void sendDiscordWebhook(
             buildAlertEmbed(alert, "🚨 [자동 알림] 고위험 경보 탐지"),
             false,
             false,
             alert
           );
-        }
-      });
+        });
+      }
     }
 
-    function showAlertToast(items) {
+    function showAlertToast(items, titleText = "새 알림") {
       let box = document.getElementById("toastBox");
       if (!box) {
         box = document.createElement("div");
@@ -1409,7 +1429,7 @@
       head.className = "flex items-center justify-between mb-1";
       const title = document.createElement("span");
       title.className = "font-bold";
-      title.textContent = items.length > 1 ? `새 알림 ${items.length}건` : "새 알림";
+      title.textContent = items.length > 1 ? `${titleText} ${items.length}건` : titleText;
       head.appendChild(title);
       if (hasSev1) {
         const badge = document.createElement("span");
@@ -1442,6 +1462,7 @@
     function startPolling() {
       if (pollingTimer) clearInterval(pollingTimer);
       seenAlertIds = null;
+      sev1NotifiedIds = new Set();
       lastLiveIncludeFp = null;
       suppressNextAlertNotifications = false;
       const generation = ++pollingGeneration;
