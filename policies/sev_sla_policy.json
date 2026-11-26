@@ -1,0 +1,176 @@
+{
+  "version": "1.0",
+  "updated_at": "2026-11-27",
+  "owner": "PM (유현우)",
+  "code_baseline": "main 9f5503a",
+  "implementation_status": {
+    "severity_assignment": "구현됨 (backend/eve_parser.py:4-11, :101; backend/live_capture.py:98-104)",
+    "sla_timer_and_reminder": "미구현 - 백엔드·프론트 모두 SLA 시간 계산·재알림·화면 표시 없음. 사람이 지키는 운영 기준",
+    "backlog_note": "SLA 경과 표시·재알림은 남은 과제(Day 4 이후). PROJECT_SPEC_QA.md 9절 참고"
+  },
+  "sla_clock_start": "경보 timestamp (Suricata eve.json 기준 시각)",
+  "severity_levels": {
+    "SEV1": {
+      "meaning": "웹 공격(sqli, xss, ssrf) 요청 자체의 HTTP 응답이 200인 침투 성공 의심",
+      "assigned_by": "자동 격상 (backend/eve_parser.py:101, backend/live_capture.py:98)",
+      "rules": [
+        1000001,
+        1000002,
+        1000006
+      ],
+      "initial_response_minutes": 5,
+      "status_update_every_minutes": 15,
+      "escalation": "SEV1 선언 후 30분 안에 원인을 못 찾으면 유현우(PM)에게 상위 보고",
+      "notify": {
+        "web_feed": true,
+        "toast": true,
+        "discord_auto": "SEV1 자동 알림을 켰을 때만, 경보당 1회 (새 SEV1 + SEV3에서 격상된 SEV1)",
+        "skip_if_verdict": "FP"
+      },
+      "isolation": {
+        "eligible": true,
+        "conditions": "ISOLATION_ENABLED=1, src_ip 172.28.0.100, 경보 시각 5분 이내",
+        "token_ttl_minutes": 10,
+        "token_single_use": true,
+        "approval": "사람이 isolate.html에서 승인 버튼을 누를 때만",
+        "release": "수동 (POST /api/unisolate)"
+      },
+      "response_window_note": "초기 대응 5분 = 토큰 발급 가능 시간(경보 후 5분)과 같은 시계. 발급 후 10분 안에 승인 결정 → 경보 후 최대 약 15분 = 첫 상황 공유 시점"
+    },
+    "SEV2": {
+      "meaning": "SSH 무차별 대입, C2 비콘 등 고위험 시도. 확인 필요",
+      "assigned_by": "룰 기본 심각도",
+      "rules": [
+        1000003,
+        1000005
+      ],
+      "initial_response_minutes": 15,
+      "status_update_every_minutes": 30,
+      "notify": {
+        "web_feed": true,
+        "toast": true,
+        "discord_auto": false,
+        "manual_send": "트리아지 화면 알림 전송 버튼"
+      },
+      "isolation": {
+        "eligible": false,
+        "reason": "backend/isolation.py:14 ELIGIBLE_SEVERITY = SEV1"
+      }
+    },
+    "SEV3": {
+      "meaning": "포트 스캔, HTTP 응답이 200이 아닌 웹 공격 시도",
+      "assigned_by": "룰 기본 심각도",
+      "rules": [
+        1000001,
+        1000002,
+        1000004,
+        1000006
+      ],
+      "initial_response_minutes": 60,
+      "status_update_every_minutes": 120,
+      "notify": {
+        "web_feed": true,
+        "toast": true,
+        "discord_auto": false,
+        "manual_send": "트리아지 화면 알림 전송 버튼"
+      },
+      "isolation": {
+        "eligible": false
+      }
+    },
+    "SEV4": {
+      "meaning": "예약 등급 - 현재 해당 룰 없음 (정보성·오탐 튜닝 대상용으로 남겨 둠)",
+      "assigned_by": "없음",
+      "rules": [],
+      "initial_response": "다음 영업일 이내",
+      "status_update": "일일 요약",
+      "notify": {
+        "web_feed": true,
+        "toast": true,
+        "discord_auto": false
+      },
+      "isolation": {
+        "eligible": false
+      }
+    }
+  },
+  "auto_escalation": {
+    "http_200": {
+      "categories": [
+        "sqli",
+        "xss",
+        "ssrf"
+      ],
+      "condition": "같은 공격 요청의 HTTP 응답이 200 (같은 연결의 다른 요청 200은 제외)",
+      "result": "SEV1, is_confirmed_risk=1",
+      "evidence": "backend/eve_parser.py:101-102"
+    },
+    "no_escalation": [
+      "bruteforce",
+      "portscan",
+      "c2_beacon"
+    ],
+    "ssrf_403": "SEV3 유지 (내부 대상이 거절한 것)",
+    "live_late_http": "라이브 모드에서 SEV3로 먼저 저장 후 늦게 온 HTTP 200이면 같은 id를 SEV1로 갱신 (backend/live_capture.py:84-104). 프론트가 격상 건을 1회 알림 (frontend/index.html:1394-1412, PR #42)",
+    "xss_note": "실습 앱 /search가 항상 200이라 XSS는 거의 항상 SEV1. 현행 유지(2026-11-27 PM 결정). 시연 격리 대상에서 제외",
+    "plaintext_secret": "마스킹만 하고 심각도는 올리지 않음 (pii_masked=1 표시). '최소 SEV2 검토' 정책은 삭제 (2026-11-27 PM 결정)"
+  },
+  "rules": [
+    {
+      "sid": 1000001,
+      "category": "sqli",
+      "base": "SEV3",
+      "escalated": "SEV1",
+      "mitre": "T1190"
+    },
+    {
+      "sid": 1000002,
+      "category": "xss",
+      "base": "SEV3",
+      "escalated": "SEV1",
+      "mitre": "T1189"
+    },
+    {
+      "sid": 1000003,
+      "category": "bruteforce",
+      "base": "SEV2",
+      "escalated": null,
+      "mitre": "T1110.001",
+      "threshold": "172.28.0.11:22 SYN 60초 4회"
+    },
+    {
+      "sid": 1000004,
+      "category": "portscan",
+      "base": "SEV3",
+      "escalated": null,
+      "mitre": "T1046",
+      "threshold": "22·80 제외 포트 SYN 10초 20회"
+    },
+    {
+      "sid": 1000005,
+      "category": "c2_beacon",
+      "base": "SEV2",
+      "escalated": null,
+      "mitre": "T1071.001 (가안)",
+      "threshold": "8443 SYN 30초 5회"
+    },
+    {
+      "sid": 1000006,
+      "category": "ssrf",
+      "base": "SEV3",
+      "escalated": "SEV1",
+      "mitre": "T1190 (가안)"
+    }
+  ],
+  "false_positive_policy": {
+    "verdicts": [
+      "TP",
+      "FP",
+      "UNREVIEWED"
+    ],
+    "unreviewed_label": "보류(미확정)",
+    "fp_effect": "기본 목록·통계·자동 알림에서 제외, include_fp=1로 다시 포함",
+    "fp_score_threshold": "미구현 (추가 목표의 '점수 3 이상 알림 생략'은 하지 않음)",
+    "fn_tn": "프론트에만 있음, 백엔드 미지원 - 남은 과제"
+  }
+}
