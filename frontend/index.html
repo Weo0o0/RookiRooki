@@ -96,6 +96,54 @@
     <span id="lastUpdated" class="text-slate-500">마지막 갱신: -</span>
   </div>
 
+  <section id="liveStatusPanel" aria-label="실시간 캡처 상태" class="hidden bg-slate-900/60 border-b border-slate-800 px-6 py-4">
+    <div class="max-w-[1600px] mx-auto space-y-4">
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <h2 class="text-sm font-bold text-slate-200">실시간 캡처 상태</h2>
+        <span id="liveCaptureState" class="text-xs font-semibold text-slate-300">상태 확인 중</span>
+      </div>
+      <p id="liveStatusNotice" role="status" class="hidden text-xs text-rose-300"></p>
+      <dl class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-xs">
+        <div class="rounded-lg border border-slate-800 bg-slate-950/70 p-3">
+          <dt class="text-slate-500">EVE 파일 경로</dt>
+          <dd id="liveEvePath" class="mt-1 text-slate-200 break-all">-</dd>
+        </div>
+        <div class="rounded-lg border border-slate-800 bg-slate-950/70 p-3">
+          <dt class="text-slate-500">마지막 폴링</dt>
+          <dd id="liveLastPollAt" class="mt-1 text-slate-200 break-all">-</dd>
+        </div>
+        <div class="rounded-lg border border-slate-800 bg-slate-950/70 p-3">
+          <dt class="text-slate-500">저장 행 수</dt>
+          <dd id="liveRowsStored" class="mt-1 text-slate-200">-</dd>
+        </div>
+        <div class="rounded-lg border border-slate-800 bg-slate-950/70 p-3">
+          <dt class="text-slate-500">범위 밖으로 건너뛴 행 수</dt>
+          <dd id="liveRowsSkipped" class="mt-1 text-slate-200">-</dd>
+        </div>
+        <div class="rounded-lg border border-slate-800 bg-slate-950/70 p-3 sm:col-span-2">
+          <dt class="text-slate-500">마지막 오류</dt>
+          <dd id="liveLastError" class="mt-1 text-slate-200 break-all">-</dd>
+        </div>
+      </dl>
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
+        <div class="rounded-lg border border-slate-800 bg-slate-950/70 p-3 space-y-2">
+          <div class="flex items-center justify-between gap-2">
+            <h3 class="text-xs font-semibold text-slate-300">시작 안내 명령</h3>
+            <button type="button" id="btnCopyLiveStartCommand" disabled class="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded text-[11px] transition disabled:opacity-50 disabled:cursor-not-allowed">복사</button>
+          </div>
+          <code id="liveStartCommand" class="block text-[11px] text-slate-300 font-mono whitespace-pre-wrap break-all">-</code>
+        </div>
+        <div class="rounded-lg border border-slate-800 bg-slate-950/70 p-3 space-y-2">
+          <div class="flex items-center justify-between gap-2">
+            <h3 class="text-xs font-semibold text-slate-300">중지 안내 명령</h3>
+            <button type="button" id="btnCopyLiveStopCommand" disabled class="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded text-[11px] transition disabled:opacity-50 disabled:cursor-not-allowed">복사</button>
+          </div>
+          <code id="liveStopCommand" class="block text-[11px] text-slate-300 font-mono whitespace-pre-wrap break-all">-</code>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- 메인 컨테이너 -->
   <main class="p-6 max-w-[1600px] mx-auto space-y-6">
 
@@ -306,7 +354,7 @@
             </div>
           </div>
 
-          <!-- 4. 시각화 (공격 스토리 & 공격 경로) 패널 -->
+<!-- 4. 시각화 (공격 스토리 & 공격 경로) 패널 -->
           <div id="vizSection" class="border-t border-slate-800 pt-5 space-y-4">
             <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2">
               <div>
@@ -327,17 +375,27 @@
             <div id="vizContent">
               <div id="vizViewFlow" role="tabpanel" aria-labelledby="tabBtnFlow" class="space-y-4">
                 <div class="bg-slate-950 border border-slate-800 rounded-lg p-3 space-y-2">
-                  <div class="flex items-center justify-between">
+                  <div class="flex items-center justify-between gap-2">
                     <span class="text-xs font-semibold text-slate-300">공격 경로 토폴로지</span>
-                    <span class="text-[11px] text-slate-500">Suricata(관찰자) · 실시간 집계</span>
+                    <div class="flex items-center gap-2">
+                      <span class="text-[11px] text-slate-500">Suricata(관찰자) · 실시간 집계</span>
+                      <button type="button" id="btnExpandPath" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-indigo-600 text-[11px] text-slate-200 hover:text-white border border-slate-700 transition">
+                        ⛶ 확대
+                      </button>
+                    </div>
                   </div>
                   <div id="pathSvgContainer" class="w-full overflow-x-auto flex justify-center py-1"></div>
                 </div>
 
                 <div class="bg-slate-950 border border-slate-800 rounded-lg p-3 space-y-2">
-                  <div class="flex items-center justify-between">
+                  <div class="flex items-center justify-between gap-2">
                     <span class="text-xs font-semibold text-slate-300">공격 진행 타임라인</span>
-                    <span class="text-[11px] text-slate-500">MITRE ATT&amp;CK 전술 단계</span>
+                    <div class="flex items-center gap-2">
+                      <span class="text-[11px] text-slate-500">MITRE ATT&amp;CK 전술 단계</span>
+                      <button type="button" id="btnExpandStory" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-indigo-600 text-[11px] text-slate-200 hover:text-white border border-slate-700 transition">
+                        ⛶ 확대
+                      </button>
+                    </div>
                   </div>
                   <div id="storyContainer" class="space-y-2 text-xs max-h-72 overflow-y-auto pr-1"></div>
                 </div>
@@ -345,12 +403,17 @@
 
               <div id="vizViewTopology" role="tabpanel" aria-labelledby="tabBtnTopology" class="hidden space-y-2">
                 <div class="bg-slate-950 border border-slate-800 rounded-lg p-3 space-y-2">
-                  <div class="flex items-center justify-between">
+                  <div class="flex items-center justify-between gap-2">
                     <div>
                       <span class="text-xs font-semibold text-slate-300">실습망 네트워크 구성도</span>
                       <span class="text-[11px] text-slate-400 block sm:inline sm:ml-2">br-minisiem (172.28.0.0/24)</span>
                     </div>
-                    <span class="text-[11px] text-slate-500">신호 흐름 · C2 방향 미정 점멸</span>
+                    <div class="flex items-center gap-2">
+                      <span class="text-[11px] text-slate-500">신호 흐름 · C2 방향 미정 점멸</span>
+                      <button type="button" id="btnExpandTopology" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-indigo-600 text-[11px] text-slate-200 hover:text-white border border-slate-700 transition">
+                        ⛶ 확대
+                      </button>
+                    </div>
                   </div>
                   <div id="topologySvgContainer" class="w-full overflow-x-auto flex justify-center py-1"></div>
                 </div>
@@ -358,9 +421,14 @@
 
               <div id="vizViewOsi" role="tabpanel" aria-labelledby="tabBtnOsi" class="hidden space-y-2">
                 <div class="bg-slate-950 border border-slate-800 rounded-lg p-3 space-y-3">
-                  <div class="flex items-center justify-between">
+                  <div class="flex items-center justify-between gap-2">
                     <span class="text-xs font-semibold text-slate-300">OSI 7계층 공격 분포</span>
-                    <span class="text-[11px] text-slate-500">초당 3회 미만 안전 깜빡임 (1.2~1.5s)</span>
+                    <div class="flex items-center gap-2">
+                      <span class="text-[11px] text-slate-500">초당 3회 미만 안전 깜빡임 (1.2~1.5s)</span>
+                      <button type="button" id="btnExpandOsi" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-indigo-600 text-[11px] text-slate-200 hover:text-white border border-slate-700 transition">
+                        ⛶ 확대
+                      </button>
+                    </div>
                   </div>
                   <div id="osiLayersContainer" class="space-y-2 text-xs"></div>
                 </div>
@@ -432,6 +500,22 @@
 
     </div> <!-- // viewAnalytics 끝 -->
   </main>
+
+  <!-- 시각화 카드 확대 모달 -->
+  <div id="vizExpandModal" class="hidden fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-xl max-w-6xl w-full max-h-[90vh] p-5 space-y-4 shadow-2xl">
+      <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-3">
+        <h2 id="vizExpandTitle" class="text-sm font-bold text-slate-100">시각화 확대</h2>
+        <div class="flex items-center gap-2">
+          <div class="flex items-center gap-1 text-[11px]" aria-label="표시 배율">
+            <span class="px-2 py-0.5 rounded font-semibold bg-indigo-600 text-white">100%</span>
+          </div>
+          <button type="button" id="btnCloseVizExpandModal" class="text-slate-400 hover:text-white text-sm" aria-label="확대 보기 닫기">✕</button>
+        </div>
+      </div>
+      <div id="vizExpandBody" class="max-h-[70vh] overflow-auto text-xs"></div>
+    </div>
+  </div>
 
   <!-- Discord 알림봇 설정 모달 -->
   <div id="alertBotModal" class="hidden fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
@@ -696,6 +780,48 @@
         )
       }
     ];
+
+    MOCK_ALERTS.push(
+      {
+        ...MOCK_ALERTS[1],
+        id: 7,
+        timestamp: "2026-11-24T13:13:45Z",
+        http_status: 200,
+        severity: "SEV1",
+        is_confirmed_risk: true,
+        verdict: "UNREVIEWED",
+        observation: "",
+        assessment: ""
+      },
+      {
+        ...MOCK_ALERTS[2],
+        id: 8,
+        timestamp: "2026-11-24T13:15:10Z"
+      },
+      {
+        ...MOCK_ALERTS[4],
+        id: 9,
+        timestamp: "2026-11-24T13:17:05Z"
+      },
+      {
+        ...MOCK_ALERTS[1],
+        id: 10,
+        timestamp: "2026-11-24T13:19:45Z"
+      },
+      {
+        ...MOCK_ALERTS[3],
+        id: 11,
+        timestamp: "2026-11-24T13:21:22Z"
+      },
+      {
+        ...MOCK_ALERTS[5],
+        id: 12,
+        timestamp: "2026-11-24T13:23:30Z",
+        http_status: 403,
+        severity: "SEV3",
+        is_confirmed_risk: false
+      }
+    );
 
     const MOCK_ANALYSIS = {
       sqli: [{
@@ -975,17 +1101,22 @@
     // ==========================================
     async function fetchDashboardData() {
       if (!isLiveMode) {
+        document.getElementById("liveStatusPanel").classList.add("hidden");
         alertsData = JSON.parse(JSON.stringify(MOCK_ALERTS));
         renderDashboardOverview();
         setStatus("🟡 Mock 데이터 모드로 동작 중입니다. (백엔드 없이 테스트 가능)");
         return;
       }
 
+      fetchLiveStatus();
       try {
         const res = await fetch(`${API_BASE}/api/alerts?limit=50`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
-        alertsData = Array.isArray(data) ? data : (data.items || data.alerts || []);
+        if (!data || !Array.isArray(data.items)) {
+          throw new Error("API 응답에 items 목록이 없습니다.");
+        }
+        alertsData = data.items;
         if (isLiveMode) notifyNewAlerts(alertsData);
 
         let stats = null;
@@ -1005,6 +1136,68 @@
         setStatus(`🟢 Live API 연결됨 (${API_BASE}) · 5초 주기 자동 갱신 중`);
       } catch (err) {
         setStatus(`🔴 API 연결 실패 (${err.message}) - 백엔드 서버 상태를 확인하세요.`, true);
+      }
+    }
+
+    async function fetchLiveStatus() {
+      const panel = document.getElementById("liveStatusPanel");
+      if (!isLiveMode) {
+        panel.classList.add("hidden");
+        return;
+      }
+
+      panel.classList.remove("hidden");
+      try {
+        const res = await fetch(`${API_BASE}/api/live/status`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const status = await res.json();
+        if (!isLiveMode) return;
+
+        document.getElementById("liveCaptureState").textContent =
+          typeof status.enabled === "boolean"
+            ? (status.enabled ? "RUNNING · 캡처 켜짐" : "STOPPED · 캡처 꺼짐")
+            : "상태 알 수 없음";
+        document.getElementById("liveEvePath").textContent = status.eve_path ?? "-";
+        document.getElementById("liveLastPollAt").textContent = status.last_poll_at ?? "-";
+        document.getElementById("liveRowsStored").textContent = status.rows_stored ?? "-";
+        document.getElementById("liveRowsSkipped").textContent = status.rows_skipped_out_of_scope ?? "-";
+        document.getElementById("liveLastError").textContent = status.last_error || "없음";
+        document.getElementById("liveStatusNotice").classList.add("hidden");
+        setLiveCommand("start", status.start_command);
+        setLiveCommand("stop", status.stop_command);
+      } catch (err) {
+        if (!isLiveMode) return;
+        const notice = document.getElementById("liveStatusNotice");
+        notice.textContent = `상태 조회 실패: ${err.message}`;
+        notice.classList.remove("hidden");
+        document.getElementById("liveCaptureState").textContent = "상태 조회 실패";
+      }
+    }
+
+    function setLiveCommand(action, command) {
+      const isStart = action === "start";
+      const commandEl = document.getElementById(isStart ? "liveStartCommand" : "liveStopCommand");
+      const copyButton = document.getElementById(isStart ? "btnCopyLiveStartCommand" : "btnCopyLiveStopCommand");
+      const hasCommand = typeof command === "string" && command.trim().length > 0;
+      commandEl.textContent = hasCommand ? command : "-";
+      copyButton.disabled = !hasCommand;
+      copyButton.textContent = "복사";
+    }
+
+    async function copyLiveCommand(action) {
+      const isStart = action === "start";
+      const commandEl = document.getElementById(isStart ? "liveStartCommand" : "liveStopCommand");
+      const copyButton = document.getElementById(isStart ? "btnCopyLiveStartCommand" : "btnCopyLiveStopCommand");
+      if (copyButton.disabled) return;
+
+      try {
+        await navigator.clipboard.writeText(commandEl.textContent);
+        copyButton.textContent = "복사됨!";
+        setTimeout(() => { copyButton.textContent = "복사"; }, 1200);
+      } catch (err) {
+        const notice = document.getElementById("liveStatusNotice");
+        notice.textContent = `클립보드 복사 실패: ${err.message}`;
+        notice.classList.remove("hidden");
       }
     }
 
@@ -1356,20 +1549,24 @@
       return map[sev] || "#94a3b8";
     }
 
-    function renderStory(items) {
+function renderStory(items, targetId = "storyContainer") {
       const emptyStateEl = document.getElementById("vizEmptyState");
       const vizContentEl = document.getElementById("vizContent");
-      const storyContainer = document.getElementById("storyContainer");
+      const storyContainer = document.getElementById(targetId);
 
       if (!items || items.length === 0) {
-        if (emptyStateEl) emptyStateEl.classList.remove("hidden");
-        if (vizContentEl) vizContentEl.classList.add("hidden");
+        if (targetId === "storyContainer") {
+          if (emptyStateEl) emptyStateEl.classList.remove("hidden");
+          if (vizContentEl) vizContentEl.classList.add("hidden");
+        }
         if (storyContainer) storyContainer.textContent = "";
         return;
       }
 
-      if (emptyStateEl) emptyStateEl.classList.add("hidden");
-      if (vizContentEl) vizContentEl.classList.remove("hidden");
+      if (targetId === "storyContainer") {
+        if (emptyStateEl) emptyStateEl.classList.add("hidden");
+        if (vizContentEl) vizContentEl.classList.remove("hidden");
+      }
       if (!storyContainer) return;
 
       const sorted = [...items].sort((a, b) => new Date(a.timestamp || 0) - new Date(b.timestamp || 0));
@@ -1456,13 +1653,15 @@
         });
       }
     }
+    const renderOsilayers = renderStory;
 
-    function renderPath(items, selected) {
-      const container = document.getElementById("pathSvgContainer");
+function renderPath(items, selected, targetId = "pathSvgContainer") {
+      const container = document.getElementById(targetId);
       if (!container) return;
       container.textContent = "";
       if (!items || items.length === 0) return;
 
+      const markerPrefix = targetId === "pathSvgContainer" ? "arrow" : "arrow-exp";
       const linksMap = new Map();
       items.forEach(a => {
         const src = a.src_ip || "unknown";
@@ -1689,12 +1888,13 @@
       return null;
     }
 
-    function renderTopology(items, selected) {
-      const container = document.getElementById("topologySvgContainer");
+function renderTopology(items, selected, targetId = "topologySvgContainer") {
+      const container = document.getElementById(targetId);
       if (!container) return;
       container.textContent = "";
       if (!items || items.length === 0) return;
 
+      const markerPrefix = targetId === "topologySvgContainer" ? "topo-arrow" : "topo-arrow-exp";
       const svgNS = "http://www.w3.org/2000/svg";
       const svgWidth = 500, svgHeight = 360;
       const svg = document.createElementNS(svgNS, "svg");
@@ -1705,7 +1905,7 @@
       const defs = document.createElementNS(svgNS, "defs");
       ["SEV1", "SEV2", "SEV3", "SEV4"].forEach(sev => {
         const marker = document.createElementNS(svgNS, "marker");
-        marker.setAttribute("id", `topo-arrow-${sev}`);
+        marker.setAttribute("id", `${markerPrefix}-${sev}`);
         marker.setAttribute("viewBox", "0 0 10 10");
         marker.setAttribute("refX", "9");
         marker.setAttribute("refY", "5");
@@ -1724,11 +1924,12 @@
       const addHost = (ip) => { if (ip && ip !== "unknown" && !hostIps.includes(ip)) hostIps.push(ip); };
       items.forEach(a => { addHost(a.src_ip); addHost(a.dest_ip); });
 
-      const bridgeX = 250, bridgeY = 175;
+      const bridgeX = 250, bridgeY = 205;
+      const hostLayoutY = 175;
       const hostCoords = new Map();
       hostIps.forEach((ip, idx) => {
         const angle = -Math.PI / 2 + (2 * Math.PI * idx) / Math.max(hostIps.length, 1);
-        hostCoords.set(ip, { x: Math.round(bridgeX + 175 * Math.cos(angle)), y: Math.round(bridgeY + 110 * Math.sin(angle)) });
+        hostCoords.set(ip, { x: Math.round(bridgeX + 175 * Math.cos(angle)), y: Math.round(hostLayoutY + 110 * Math.sin(angle)) });
       });
 
       hostIps.forEach(ip => {
@@ -1745,7 +1946,7 @@
         svg.appendChild(line);
       });
 
-      const suriX = bridgeX, suriY = bridgeY + 80;
+      const suriX = bridgeX, suriY = 255;
       const suriLine = document.createElementNS(svgNS, "line");
       suriLine.setAttribute("x1", String(bridgeX));
       suriLine.setAttribute("y1", String(bridgeY + 24));
@@ -1960,8 +2161,8 @@
     // ==========================================
     // 5-C. OSI 7계층 공격 분포 뷰 렌더링
     // ==========================================
-    function renderOsiLayers(items, selected) {
-      const container = document.getElementById("osiLayersContainer");
+function renderOsiLayers(items, selected, targetId = "osiLayersContainer") {
+      const container = document.getElementById(targetId);
       if (!container) return;
       container.textContent = "";
       if (!items || items.length === 0) return;
@@ -2115,6 +2316,53 @@
       document.getElementById("vizViewOsi")?.classList.toggle("hidden", tab !== "osi");
       renderCurrentViz();
     }
+    function openExpandedVizCard(mode) {
+      const modal = document.getElementById("vizExpandModal");
+      const titleEl = document.getElementById("vizExpandTitle");
+      const bodyEl = document.getElementById("vizExpandBody");
+      if (!modal || !bodyEl) return;
+
+      const currentSelected = alertsData.find(a => String(a.id) === String(selectedAlertId));
+      bodyEl.textContent = "";
+
+      if (!alertsData || alertsData.length === 0) {
+        bodyEl.textContent = "표시할 공격 데이터가 없습니다.";
+        modal.classList.remove("hidden");
+        return;
+      }
+
+      if (mode === "path") {
+        if (titleEl) titleEl.textContent = "⛶ 공격 경로 토폴로지 (확대 분석)";
+        const wrap = document.createElement("div");
+        wrap.id = "expandedPathOnlyContainer";
+        wrap.className = "w-full py-2";
+        bodyEl.appendChild(wrap);
+        renderPath(alertsData, currentSelected, "expandedPathOnlyContainer");
+      } else if (mode === "story") {
+        if (titleEl) titleEl.textContent = "⛶ 공격 진행 타임라인 (MITRE ATT&CK 전술 단계 · 확대 분석)";
+        const wrap = document.createElement("div");
+        wrap.id = "expandedStoryOnlyContainer";
+        wrap.className = "space-y-2.5";
+        bodyEl.appendChild(wrap);
+        renderStory(alertsData, "expandedStoryOnlyContainer");
+      } else if (mode === "topology") {
+        if (titleEl) titleEl.textContent = "⛶ 실습망 네트워크 구성도 (br-minisiem 172.28.0.0/24 · 확대 분석)";
+        const wrap = document.createElement("div");
+        wrap.id = "expandedTopoOnlyContainer";
+        wrap.className = "w-full py-2";
+        bodyEl.appendChild(wrap);
+        renderTopology(alertsData, currentSelected, "expandedTopoOnlyContainer");
+      } else if (mode === "osi") {
+        if (titleEl) titleEl.textContent = "⛶ OSI 7계층 공격 분포 (확대 분석)";
+        const wrap = document.createElement("div");
+        wrap.id = "expandedOsiOnlyContainer";
+        wrap.className = "space-y-2.5";
+        bodyEl.appendChild(wrap);
+        renderOsiLayers(alertsData, currentSelected, "expandedOsiOnlyContainer");
+      }
+
+      modal.classList.remove("hidden");
+    }
 
     // ==========================================
     // 5. 사용자 액션 (트리아지 저장, PCAP 업로드, 모드 전환)
@@ -2179,11 +2427,15 @@
 
     document.getElementById("btnMockMode").addEventListener("click", () => {
       isLiveMode = false;
+      document.getElementById("liveStatusPanel").classList.add("hidden");
       clearDetailPanel();
       document.getElementById("btnMockMode").className = "px-3 py-1 rounded-md font-semibold bg-sky-600 text-white transition";
       document.getElementById("btnLiveMode").className = "px-3 py-1 rounded-md font-semibold text-slate-400 hover:text-white transition";
       startPolling();
     });
+
+    document.getElementById("btnCopyLiveStartCommand").addEventListener("click", () => copyLiveCommand("start"));
+    document.getElementById("btnCopyLiveStopCommand").addEventListener("click", () => copyLiveCommand("stop"));
 
     document.getElementById("btnLiveMode").addEventListener("click", () => {
       isLiveMode = true;
@@ -2253,7 +2505,14 @@
     document.getElementById("tabBtnFlow").addEventListener("click", () => switchVizTab("flow"));
     document.getElementById("tabBtnTopology").addEventListener("click", () => switchVizTab("topology"));
     document.getElementById("tabBtnOsi").addEventListener("click", () => switchVizTab("osi"));
+    document.getElementById("btnExpandPath")?.addEventListener("click", () => openExpandedVizCard("path"));
+    document.getElementById("btnExpandStory")?.addEventListener("click", () => openExpandedVizCard("story"));
+    document.getElementById("btnExpandTopology")?.addEventListener("click", () => openExpandedVizCard("topology"));
+    document.getElementById("btnExpandOsi")?.addEventListener("click", () => openExpandedVizCard("osi"));
 
+    document.getElementById("btnCloseVizExpandModal")?.addEventListener("click", () => {
+      document.getElementById("vizExpandModal")?.classList.add("hidden");
+    });
     // ==========================================
     // 7. 분석 통계 모듈 (1~4순위 통합 + 메인 탭 전환)
     // ==========================================
