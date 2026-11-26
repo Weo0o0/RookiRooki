@@ -1201,7 +1201,9 @@
         if (!data || !Array.isArray(data.items)) {
           throw new Error("API 응답에 items 목록이 없습니다.");
         }
-        alertsData = data.items;
+        alertsData = includeFp
+          ? data.items
+          : data.items.filter(alert => (alert.verdict || "UNREVIEWED") !== "FP");
         notifyNewAlerts(alertsData, suppressNextAlertNotifications);
         suppressNextAlertNotifications = false;
         lastLiveIncludeFp = includeFp;
@@ -1592,7 +1594,7 @@
           ? `<span class="ml-1 px-1.5 py-0.5 text-[10px] bg-rose-600 text-white rounded">확정위험</span>`
           : "";
         const containedBadge = isIpContained(alert.src_ip)
-          ? `<span class="ml-1 px-1.5 py-0.5 text-[10px] bg-amber-600 text-white rounded">🔒 격리됨</span>`
+          ? `<span class="ml-1 px-1.5 py-0.5 text-[10px] bg-amber-600 text-white rounded">🧪 시뮬</span>`
           : "";
         const verdict = alert.verdict || "UNREVIEWED";
         const verdictStyle = verdict === "TP"
@@ -1609,6 +1611,10 @@
         const categoryText = String(alert.category || "unknown").toUpperCase();
         const timeText = String(alert.timestamp || "").slice(11, 19) || "-";
 
+        const actionBadge = (actionStatus === "ISOLATED" || actionStatus === "GUIDE_ONLY")
+          ? `<span class="inline-flex mt-1 px-1.5 py-0.5 rounded border text-[10px] ${actionStyle}">${escapeHtml(getActionStatusLabel(actionStatus))}</span>`
+          : "";
+
         return `
           <tr data-alert-id="${escapeHtml(alert.id)}" class="cursor-pointer transition ${rowBg}">
             <td class="px-4 py-3 font-mono text-slate-400 whitespace-nowrap">${escapeHtml(timeText)}</td>
@@ -1622,7 +1628,7 @@
             </td>
             <td class="px-3 py-3 whitespace-nowrap">
               <span class="inline-flex px-1.5 py-0.5 rounded border text-[10px] font-bold ${verdictStyle}">${escapeHtml(getVerdictLabel(verdict))}</span>
-              <span class="inline-flex mt-1 px-1.5 py-0.5 rounded border text-[10px] ${actionStyle}">${escapeHtml(getActionStatusLabel(actionStatus))}</span>
+              ${actionBadge}
             </td>
           </tr>
         `;
@@ -2599,7 +2605,7 @@ function renderTopology(items, selected, targetId = "topologySvgContainer") {
         await fetchDashboardData();
         const updated = alertsData.find(a => String(a.id) === String(alertId));
         if (updated) renderDetailPanel(updated);
-        const message = `[Mock] 경보 #${alertId}의 트리아지 결과를 이 브라우저에만 저장했습니다.`;
+        const message = `[Mock] 경보 #${alertId}의 트리아지 결과를 이 브라우저에만 저장했습니다. 새로고침하면 사라집니다`;
         setStatus(`✅ ${message}`);
         showTriageToast(message);
         return;
@@ -2611,7 +2617,21 @@ function renderTopology(items, selected, targetId = "topologySvgContainer") {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload)
         });
-        if (!res.ok) throw new Error(`HTTP ${res.status} ${await res.text()}`);
+        if (!res.ok) {
+          let errorMsg = "";
+          try {
+            const errJson = await res.json();
+            if (errJson && typeof errJson.detail === "string" && errJson.detail.trim().length > 0) {
+              errorMsg = errJson.detail;
+            }
+          } catch (_) {}
+          if (!errorMsg) {
+            errorMsg = String(res.status);
+          }
+          setStatus(`🔴 ${errorMsg}`, true);
+          showTriageToast(errorMsg, true);
+          return;
+        }
         const message = `경보 #${alertId}의 트리아지 결과를 저장했습니다.`;
         setStatus(`✅ ${message}`);
         showTriageToast(message);
