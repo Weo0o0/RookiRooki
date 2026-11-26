@@ -586,6 +586,8 @@
     let alertsData = [];
     let selectedAlertId = null;
     let pollingTimer = null;
+    let pollingGeneration = 0;
+    let dashboardRequestId = 0;
     let categoryChartInstance = null;
     let currentVizTab = "flow"; // "flow" | "topology" | "osi"
 
@@ -1123,8 +1125,13 @@
     // ==========================================
     // 3. 데이터 로딩 (Mock / Live 5초 폴링)
     // ==========================================
-    async function fetchDashboardData() {
+    async function fetchDashboardData(generation = pollingGeneration) {
+      const requestId = ++dashboardRequestId;
+      const isCurrentRequest = () =>
+        generation === pollingGeneration && requestId === dashboardRequestId;
+
       if (!isLiveMode) {
+        if (!isCurrentRequest()) return;
         document.getElementById("liveStatusPanel").classList.add("hidden");
         alertsData = JSON.parse(JSON.stringify(MOCK_ALERTS));
         renderDashboardOverview();
@@ -1132,22 +1139,25 @@
         return;
       }
 
-      fetchLiveStatus();
+      fetchLiveStatus(generation);
       try {
         const res = await fetch(`${API_BASE}/api/alerts?limit=200`);
+        if (!isCurrentRequest() || !isLiveMode) return;
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
+        if (!isCurrentRequest() || !isLiveMode) return;
         if (!data || !Array.isArray(data.items)) {
           throw new Error("API 응답에 items 목록이 없습니다.");
         }
         alertsData = data.items;
-        if (isLiveMode) notifyNewAlerts(alertsData);
+        notifyNewAlerts(alertsData);
 
         let stats = null;
         try {
           const statsRes = await fetch(`${API_BASE}/api/stats`);
           if (statsRes.ok) stats = await statsRes.json();
         } catch (_) {}
+        if (!isCurrentRequest() || !isLiveMode) return;
 
         if (
           alertsData.length === 0 ||
@@ -1159,13 +1169,14 @@
         renderDashboardOverview(stats);
         setStatus(`🟢 Live API 연결됨 (${API_BASE}) · 5초 주기 자동 갱신 중`);
       } catch (err) {
+        if (!isCurrentRequest() || !isLiveMode) return;
         setStatus(`🔴 API 연결 실패 (${err.message}) - 백엔드 서버 상태를 확인하세요.`, true);
       }
     }
 
-    async function fetchLiveStatus() {
+    async function fetchLiveStatus(generation = pollingGeneration) {
       const panel = document.getElementById("liveStatusPanel");
-      if (!isLiveMode) {
+      if (!isLiveMode || generation !== pollingGeneration) {
         panel.classList.add("hidden");
         return;
       }
@@ -1175,7 +1186,7 @@
         const res = await fetch(`${API_BASE}/api/live/status`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const status = await res.json();
-        if (!isLiveMode) return;
+        if (!isLiveMode || generation !== pollingGeneration) return;
 
         const stateEl = document.getElementById("liveCaptureState");
         const hasLastError = typeof status.last_error === "string" && status.last_error.trim().length > 0;
@@ -1195,7 +1206,7 @@
         setLiveCommand("start", status.start_command);
         setLiveCommand("stop", status.stop_command);
       } catch (err) {
-        if (!isLiveMode) return;
+        if (!isLiveMode || generation !== pollingGeneration) return;
         const notice = document.getElementById("liveStatusNotice");
         notice.textContent = `상태 조회 실패: ${err.message}`;
         notice.classList.remove("hidden");
@@ -1232,7 +1243,7 @@
       }
     }
 
-    // Live 폴링 새 알림 토스트: 첫 응답은 기준선으로만 기록
+    // Live 폴링 신규 경보: 첫 응답은 기존 경보 기준선으로만 처리
     let seenAlertIds = null;
 
     function notifyNewAlerts(list) {
@@ -1243,7 +1254,19 @@
       }
       const fresh = list.filter(a => !seenAlertIds.has(String(a.id)));
       ids.forEach(id => seenAlertIds.add(id));
-      if (fresh.length) showAlertToast(fresh);
+      if (!fresh.length) return;
+
+      showAlertToast(fresh);
+      fresh.forEach(alert => {
+        pushWebNotification(buildAlertEmbed(alert), "Live API", false);
+        if (alert.severity === "SEV1" && isAutoNotifyEnabled()) {
+          void sendDiscordWebhook(
+            buildAlertEmbed(alert, "🚨 [자동 알림] 고위험 경보 탐지"),
+            false,
+            false
+          );
+        }
+      });
     }
 
     function showAlertToast(items) {
@@ -1296,8 +1319,9 @@
     function startPolling() {
       if (pollingTimer) clearInterval(pollingTimer);
       seenAlertIds = null;
-      fetchDashboardData();
-      pollingTimer = setInterval(fetchDashboardData, 5000);
+      const generation = ++pollingGeneration;
+      fetchDashboardData(generation);
+      pollingTimer = setInterval(() => fetchDashboardData(generation), 5000);
     }
 
     // ==========================================
@@ -1310,7 +1334,6 @@
       if (currentMainView === "analytics") {
         renderAnalyticsDashboard();
       }
-      checkAndAutoNotifySev1(alertsData);
     }
 
     function renderKPIAndChart(serverStats) {
@@ -2470,6 +2493,7 @@ function renderTopology(items, selected, targetId = "topologySvgContainer") {
     })();
 
     document.getElementById("btnMockMode").addEventListener("click", () => {
+      if (!isLiveMode) return;
       isLiveMode = false;
       document.getElementById("liveStatusPanel").classList.add("hidden");
       clearDetailPanel();
@@ -2482,8 +2506,12 @@ function renderTopology(items, selected, targetId = "topologySvgContainer") {
     document.getElementById("btnCopyLiveStopCommand").addEventListener("click", () => copyLiveCommand("stop"));
 
     document.getElementById("btnLiveMode").addEventListener("click", () => {
+      if (isLiveMode) return;
       isLiveMode = true;
+      alertsData = [];
       clearDetailPanel();
+      renderDashboardOverview();
+      setStatus("⏳ Live API에서 경보를 불러오는 중입니다.");
       document.getElementById("btnLiveMode").className = "px-3 py-1 rounded-md font-semibold bg-emerald-600 text-white transition";
       document.getElementById("btnMockMode").className = "px-3 py-1 rounded-md font-semibold text-slate-400 hover:text-white transition";
       startPolling();
@@ -2895,7 +2923,6 @@ function renderTopology(items, selected, targetId = "topologySvgContainer") {
     // ==========================================
     const CONT_DURATION_MS = 10 * 60 * 1000; // 10분 임시 격리
     const containedIps = new Map();
-    const notifiedAlertIds = new Set();
     const webNotificationFeed = [];
 
     function getWebhookUrl() {
@@ -2929,7 +2956,7 @@ function renderTopology(items, selected, targetId = "topologySvgContainer") {
       return "#38bdf8";
     }
 
-    function pushWebNotification(embedPayload, channelLabel) {
+    function pushWebNotification(embedPayload, channelLabel, showToast = true) {
       const nowTime = new Date().toLocaleTimeString("ko-KR");
       const accentHex = embedColorToHex(embedPayload.color);
 
@@ -2946,6 +2973,7 @@ function renderTopology(items, selected, targetId = "topologySvgContainer") {
       if (countEl) countEl.textContent = String(webNotificationFeed.length);
       renderNotifFeedList();
 
+      if (!showToast) return;
       const container = document.getElementById("webToastContainer");
       if (!container) return;
 
@@ -3059,11 +3087,11 @@ function renderTopology(items, selected, targetId = "topologySvgContainer") {
       }
     }
 
-    async function sendDiscordWebhook(embedPayload) {
+    async function sendDiscordWebhook(embedPayload, showToast = true, recordFeed = true) {
       const url = getWebhookUrl();
 
       if (!url) {
-        pushWebNotification(embedPayload, "웹 시뮬레이션");
+        if (recordFeed) pushWebNotification(embedPayload, "웹 시뮬레이션", showToast);
         setStatus("🔔 [웹 알림 출력] Discord URL 미설정 상태이므로 웹 화면에만 출력했습니다.");
         return true;
       }
@@ -3075,10 +3103,10 @@ function renderTopology(items, selected, targetId = "topologySvgContainer") {
           body: JSON.stringify({ username: "Mini-SIEM SOC Bot", embeds: [embedPayload] })
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        pushWebNotification(embedPayload, "Web + Discord");
+        if (recordFeed) pushWebNotification(embedPayload, "Web + Discord", showToast);
         return true;
       } catch (err) {
-        pushWebNotification(embedPayload, "웹 출력 (Discord 실패)");
+        if (recordFeed) pushWebNotification(embedPayload, "웹 출력 (Discord 실패)", showToast);
         setStatus(`🔴 Discord 발송 실패 (${err.message}) · 웹 화면에는 기록되었습니다.`, true);
         return false;
       }
@@ -3099,17 +3127,6 @@ function renderTopology(items, selected, targetId = "topologySvgContainer") {
         footer: { text: "Mini-SIEM SOC Dashboard · Human-in-the-Loop" },
         timestamp: new Date().toISOString()
       };
-    }
-
-    async function checkAndAutoNotifySev1(items) {
-      if (!isAutoNotifyEnabled()) return;
-      for (const alert of (items || [])) {
-        const key = String(alert.id);
-        if (alert.severity === "SEV1" && !notifiedAlertIds.has(key)) {
-          notifiedAlertIds.add(key);
-          await sendDiscordWebhook(buildAlertEmbed(alert, "🚨 [자동 알림] 고위험 경보 탐지"));
-        }
-      }
     }
 
     document.getElementById("btnAlertBotModal")?.addEventListener("click", () => {
