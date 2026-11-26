@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mini-SIEM 승인 기반 격리 확인</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans flex items-center justify-center p-6">
+  <main class="w-full max-w-xl bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-5 shadow-2xl">
+    <div class="flex items-center justify-between border-b border-slate-800 pb-4">
+      <div>
+        <h1 class="text-lg font-bold text-sky-400">승인 기반 컨테이너 격리</h1>
+        <p class="text-xs text-slate-400">실습망(172.28.0.0/24) 수동 승인 전용</p>
+      </div>
+      <a href="index.html" class="text-xs text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 px-3 py-1.5 rounded-lg transition">← 대시보드로</a>
+    </div>
+
+    <div id="msg" role="status" class="text-sm font-semibold text-slate-200"></div>
+
+    <dl id="alertSummary" class="hidden grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs bg-slate-950 border border-slate-800 rounded-lg p-4"></dl>
+
+    <div id="targetInfo" class="hidden space-y-1.5 text-xs bg-amber-500/10 border border-amber-500/30 text-amber-200 rounded-lg p-4"></div>
+
+    <div class="flex flex-wrap items-center gap-3">
+      <button type="button" id="btnApprove" class="bg-rose-600 hover:bg-rose-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-semibold px-4 py-2.5 rounded-lg transition">승인(격리 실행)</button>
+      <button type="button" id="btnCancel" class="bg-slate-800 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed border border-slate-700 text-slate-200 text-xs font-semibold px-4 py-2.5 rounded-lg transition">취소</button>
+      <button type="button" id="btnUnisolate" class="hidden bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-semibold px-4 py-2.5 rounded-lg transition">격리 해제</button>
+    </div>
+
+    <div id="result" role="region" aria-live="polite" class="hidden text-xs rounded-lg border border-slate-800 bg-slate-950 p-3.5 space-y-1"></div>
+
+    <div id="statusLine" class="hidden border-t border-slate-800 pt-4 text-xs text-slate-400 space-y-2"></div>
+  </main>
+
+  <script>
+    (() => {
+      const API_BASE = "http://localhost:8000";
+      const rawAlertId = new URLSearchParams(location.search).get("alert_id");
+      const token = new URLSearchParams(location.hash.slice(1)).get("token");
+      history.replaceState(null, "", location.pathname + location.search);
+
+      const msgEl = document.getElementById("msg");
+      const summaryEl = document.getElementById("alertSummary");
+      const targetInfoEl = document.getElementById("targetInfo");
+      const btnApprove = document.getElementById("btnApprove");
+      const btnCancel = document.getElementById("btnCancel");
+      const btnUnisolate = document.getElementById("btnUnisolate");
+      const resultEl = document.getElementById("result");
+      const statusLineEl = document.getElementById("statusLine");
+
+      function hideApprove() {
+        btnApprove.disabled = true;
+        btnApprove.classList.add("hidden");
+      }
+
+      function hideAllButtons() {
+        hideApprove();
+        btnCancel.disabled = true;
+        btnCancel.classList.add("hidden");
+        btnUnisolate.disabled = true;
+        btnUnisolate.classList.add("hidden");
+      }
+
+      function showResultLines(lines, isError = false) {
+        resultEl.textContent = "";
+        resultEl.className = "text-xs rounded-lg border p-3.5 space-y-1 " + (
+          isError
+            ? "border-rose-500/40 bg-rose-950/30 text-rose-200"
+            : "border-slate-800 bg-slate-950 text-slate-200"
+        );
+        lines.forEach(line => {
+          const p = document.createElement("p");
+          p.textContent = line;
+          resultEl.appendChild(p);
+        });
+        resultEl.classList.remove("hidden");
+      }
+
+      if (!rawAlertId || !/^\d+$/.test(rawAlertId) || !token) {
+        msgEl.textContent = "링크가 올바르지 않습니다";
+        hideAllButtons();
+        return;
+      }
+
+      const alertId = Number(rawAlertId);
+      let isolateAttempted = false;
+      let unisolateInFlight = false;
+
+      function addSummaryItem(label, value, fullWidth = false) {
+        const wrap = document.createElement("div");
+        if (fullWidth) wrap.className = "sm:col-span-2";
+        const dt = document.createElement("dt");
+        dt.className = "text-slate-500";
+        dt.textContent = label;
+        const dd = document.createElement("dd");
+        dd.className = "mt-0.5 text-slate-200 font-mono break-all";
+        dd.textContent = value;
+        wrap.append(dt, dd);
+        summaryEl.appendChild(wrap);
+      }
+
+      function renderAlert(alert) {
+        summaryEl.textContent = "";
+        const httpStatus = alert.http_status !== null && alert.http_status !== undefined && alert.http_status !== ""
+          ? String(alert.http_status)
+          : "-";
+        addSummaryItem("번호", String(alert.id ?? alertId));
+        addSummaryItem("시간", String(alert.timestamp || "-"));
+        addSummaryItem("심각도", String(alert.severity || "-"));
+        addSummaryItem("HTTP 상태", httpStatus);
+        addSummaryItem("시그니처", String(alert.signature || "-"), true);
+        addSummaryItem(
+          "출발지 → 목적지",
+          `${alert.src_ip || "-"} → ${alert.dest_ip || "-"}:${alert.dest_port ?? "-"}`,
+          true
+        );
+        summaryEl.classList.remove("hidden");
+
+        targetInfoEl.textContent = "";
+        const line1 = document.createElement("p");
+        line1.className = "font-semibold";
+        line1.textContent = `이 컨테이너를 실습망에서 끊습니다: ${alert.src_ip || "-"}`;
+        const line2 = document.createElement("p");
+        line2.textContent = "허용 대상은 attacker(172.28.0.100) 하나뿐이며 최종 판단은 서버가 합니다";
+        targetInfoEl.append(line1, line2);
+        targetInfoEl.classList.remove("hidden");
+      }
+
+      async function extractErrorMessage(res) {
+        try {
+          const data = await res.json();
+          if (data && typeof data.detail === "string") {
+            return data.detail;
+          }
+        } catch (_) {}
+        return `요청 실패 (HTTP ${res.status})`;
+      }
+
+      async function loadIsolationStatus() {
+        try {
+          const res = await fetch(`${API_BASE}/api/isolation/status`);
+          if (!res.ok) {
+            statusLineEl.classList.add("hidden");
+            statusLineEl.textContent = "";
+            return;
+          }
+          const data = await res.json();
+          statusLineEl.textContent = "";
+
+          const line = document.createElement("p");
+          if (data.enabled === false) {
+            line.textContent = "서버에서 격리 기능이 꺼져 있습니다(ISOLATION_ENABLED=1 필요)";
+          } else {
+            const ips = Array.isArray(data.isolated_ips) && data.isolated_ips.length > 0
+              ? data.isolated_ips.join(", ")
+              : "없음";
+            line.textContent = `현재 격리 중: ${ips}`;
+          }
+          statusLineEl.appendChild(line);
+
+          if (Array.isArray(data.recent) && data.recent.length > 0) {
+            const list = document.createElement("ul");
+            list.className = "space-y-1 text-[11px] text-slate-500 font-mono";
+            data.recent.slice(0, 5).forEach(entry => {
+              const li = document.createElement("li");
+              const parts = [
+                entry.created_at || "-",
+                entry.action || "-",
+                entry.result || "-",
+                entry.ip || "-"
+              ];
+              if (entry.detail) parts.push(String(entry.detail));
+              li.textContent = parts.join(" · ");
+              list.appendChild(li);
+            });
+            statusLineEl.appendChild(list);
+          }
+
+          statusLineEl.classList.remove("hidden");
+        } catch (_) {
+          statusLineEl.classList.add("hidden");
+          statusLineEl.textContent = "";
+        }
+      }
+
+      async function loadAlert() {
+        try {
+          const res = await fetch(`${API_BASE}/api/alerts/${encodeURIComponent(String(alertId))}`);
+          if (res.status === 404) {
+            msgEl.textContent = "경보를 찾을 수 없습니다";
+            hideApprove();
+            return;
+          }
+          if (!res.ok) {
+            msgEl.textContent = `요청 실패 (HTTP ${res.status})`;
+            hideApprove();
+            return;
+          }
+          const alert = await res.json();
+          renderAlert(alert);
+        } catch (_) {
+          msgEl.textContent = "백엔드에 연결할 수 없습니다 (http://localhost:8000)";
+          hideApprove();
+        }
+      }
+
+      btnCancel.addEventListener("click", () => {
+        if (isolateAttempted) return;
+        hideApprove();
+        btnCancel.disabled = true;
+        msgEl.textContent = "취소했습니다. 이 창을 닫아도 됩니다";
+        showResultLines(["취소했습니다. 이 창을 닫아도 됩니다"], false);
+      });
+
+      btnApprove.addEventListener("click", async () => {
+        if (isolateAttempted) return;
+        isolateAttempted = true;
+        btnApprove.disabled = true;
+        btnCancel.disabled = true;
+
+        try {
+          const res = await fetch(`${API_BASE}/api/isolate`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ alert_id: alertId, token })
+          });
+          if (res.ok) {
+            const data = (await res.json().catch(() => ({}))) || {};
+            const text = `격리했습니다 (${data.ip || "-"}, ${data.container || "-"})`;
+            msgEl.textContent = text;
+            showResultLines([text], false);
+            btnUnisolate.classList.remove("hidden");
+            btnUnisolate.disabled = false;
+            await loadIsolationStatus();
+            return;
+          }
+          const errMsg = await extractErrorMessage(res);
+          msgEl.textContent = `${errMsg} — 새 경보 링크로 다시 시도하세요`;
+          showResultLines([errMsg, "새 경보 링크로 다시 시도하세요"], true);
+        } catch (_) {
+          hideApprove();
+          const errMsg = "백엔드에 연결할 수 없습니다 (http://localhost:8000)";
+          msgEl.textContent = `${errMsg} — 새 경보 링크로 다시 시도하세요`;
+          showResultLines([errMsg, "새 경보 링크로 다시 시도하세요"], true);
+        }
+      });
+
+      btnUnisolate.addEventListener("click", async () => {
+        if (unisolateInFlight) return;
+        unisolateInFlight = true;
+        btnUnisolate.disabled = true;
+
+        try {
+          const res = await fetch(`${API_BASE}/api/unisolate`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ alert_id: alertId })
+          });
+          if (res.ok) {
+            msgEl.textContent = "해제했습니다";
+            showResultLines(["해제했습니다"], false);
+            await loadIsolationStatus();
+            unisolateInFlight = false;
+            return;
+          }
+          const errMsg = await extractErrorMessage(res);
+          msgEl.textContent = errMsg;
+          showResultLines([errMsg], true);
+          btnUnisolate.disabled = false;
+          unisolateInFlight = false;
+        } catch (_) {
+          hideApprove();
+          const errMsg = "백엔드에 연결할 수 없습니다 (http://localhost:8000)";
+          msgEl.textContent = errMsg;
+          showResultLines([errMsg], true);
+          btnUnisolate.disabled = false;
+          unisolateInFlight = false;
+        }
+      });
+
+      void loadAlert();
+      void loadIsolationStatus();
+    })();
+  </script>
+</body>
+</html>

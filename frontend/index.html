@@ -183,7 +183,7 @@
             <p id="kpiConfirmed" class="text-2xl font-bold mt-1 text-amber-400">0</p>
           </div>
           <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
-            <p class="text-xs text-slate-400">미검토 (UNREVIEWED)</p>
+            <p class="text-xs text-slate-400">보류(미확정) (UNREVIEWED)</p>
             <p id="kpiUnreviewed" class="text-2xl font-bold mt-1 text-sky-400">0</p>
           </div>
         </div>
@@ -217,7 +217,7 @@
                 <option value="FP">오탐 (FP)</option>
                 <option value="FN">미탐 (FN · API 미지원)</option>
                 <option value="TN">정미탐 (TN · API 미지원)</option>
-                <option value="UNREVIEWED">미검토 (UNREVIEWED)</option>
+                <option value="UNREVIEWED">보류(미확정) (UNREVIEWED)</option>
               </select>
               <label class="inline-flex items-center gap-1.5 px-2 py-1 text-slate-300 whitespace-nowrap">
                 <input id="includeFpToggle" type="checkbox" class="accent-sky-500" />
@@ -295,7 +295,7 @@
                 <div>
                   <label class="block text-slate-400 mb-1">판정 (Verdict)</label>
                   <select id="triageVerdict" class="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1.5 text-white">
-                    <option value="UNREVIEWED">미검토 (UNREVIEWED)</option>
+                    <option value="UNREVIEWED">보류(미확정) (UNREVIEWED)</option>
                     <option value="TP">TP (정탐)</option>
                     <option value="FP">FP (오탐)</option>
                   </select>
@@ -538,7 +538,7 @@
             <label class="inline-flex items-center gap-1 text-emerald-300"><input type="checkbox" data-rule-verdict="FP" checked class="accent-emerald-500" />오탐</label>
             <label class="inline-flex items-center gap-1 text-amber-300"><input type="checkbox" data-rule-verdict="FN" checked class="accent-amber-500" />미탐</label>
             <label class="inline-flex items-center gap-1 text-cyan-300"><input type="checkbox" data-rule-verdict="TN" checked class="accent-cyan-500" />정미탐</label>
-            <label class="inline-flex items-center gap-1 text-slate-300"><input type="checkbox" data-rule-verdict="UNREVIEWED" checked class="accent-slate-500" />미검토</label>
+            <label class="inline-flex items-center gap-1 text-slate-300"><input type="checkbox" data-rule-verdict="UNREVIEWED" checked class="accent-slate-500" />보류(미확정)</label>
           </fieldset>
           <p class="text-[10px] text-amber-300">오탐(FP) 집계는 관제 화면의 FP 포함 설정을 따릅니다. 미탐·정미탐은 API 미지원으로 데이터가 없습니다.</p>
           <div class="relative h-64">
@@ -1385,7 +1385,8 @@
           void sendDiscordWebhook(
             buildAlertEmbed(alert, "🚨 [자동 알림] 고위험 경보 탐지"),
             false,
-            false
+            false,
+            alert
           );
         }
       });
@@ -1584,7 +1585,7 @@
     }
 
     function getVerdictLabel(verdict) {
-      if (verdict === "UNREVIEWED") return "미검토";
+      if (verdict === "UNREVIEWED") return "보류(미확정)";
       if (verdict === "TP") return "정탐";
       if (verdict === "FP") return "오탐";
       if (verdict === "FN") return "미탐";
@@ -3072,7 +3073,7 @@ function renderTopology(items, selected, targetId = "topologySvgContainer") {
         { verdict: "FP", label: "오탐 (FP)", backgroundColor: "#10b981" },
         { verdict: "FN", label: "미탐 (FN · API 미지원)", backgroundColor: "#f59e0b" },
         { verdict: "TN", label: "정미탐 (TN · API 미지원)", backgroundColor: "#06b6d4" },
-        { verdict: "UNREVIEWED", label: "미검토", backgroundColor: "#64748b" }
+        { verdict: "UNREVIEWED", label: "보류(미확정)", backgroundColor: "#64748b" }
       ];
       const datasets = verdictDatasets
         .filter(item => visibleVerdicts.has(item.verdict))
@@ -3515,7 +3516,14 @@ function renderTopology(items, selected, targetId = "topologySvgContainer") {
       }
     }
 
-    async function sendDiscordWebhook(embedPayload, showToast = true, recordFeed = true) {
+    function buildIsolateUrl(alert) {
+      const u = new URL("isolate.html", location.href);
+      u.searchParams.set("alert_id", String(alert.id));
+      u.hash = "token=" + encodeURIComponent(alert.isolation_token);
+      return u.toString();
+    }
+
+    async function sendDiscordWebhook(embedPayload, showToast = true, recordFeed = true, alert = null) {
       const url = getWebhookUrl();
 
       if (!url) {
@@ -3524,11 +3532,15 @@ function renderTopology(items, selected, targetId = "topologySvgContainer") {
         return true;
       }
 
+      const discordEmbed = (alert && alert.severity === "SEV1" && typeof alert.isolation_token === "string" && alert.isolation_token !== "")
+        ? { ...embedPayload, fields: [...(embedPayload.fields || []), { name: "격리 확인", value: `[확인 페이지 열기](${buildIsolateUrl(alert)})`, inline: false }] }
+        : embedPayload;
+
       try {
         const res = await fetch(url, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ username: "Mini-SIEM SOC Bot", embeds: [embedPayload] })
+          body: JSON.stringify({ username: "Mini-SIEM SOC Bot", embeds: [discordEmbed] })
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         if (recordFeed) pushWebNotification(embedPayload, "Web + Discord", showToast);
@@ -3631,7 +3643,7 @@ function renderTopology(items, selected, targetId = "topologySvgContainer") {
     document.getElementById("btnSendDiscordAlert")?.addEventListener("click", async () => {
       const alert = alertsData.find(a => String(a.id) === String(selectedAlertId));
       if (!alert) return;
-      const ok = await sendDiscordWebhook(buildAlertEmbed(alert));
+      const ok = await sendDiscordWebhook(buildAlertEmbed(alert), true, true, alert);
       if (ok && getWebhookUrl()) setStatus(`✅ 경보 #${alert.id} 웹 및 Discord 알림 발송 완료`);
     });
 
