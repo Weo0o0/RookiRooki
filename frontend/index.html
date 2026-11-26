@@ -87,6 +87,11 @@
         <button type="button" id="btnMockMode" class="px-3 py-1 rounded-md font-semibold bg-sky-600 text-white transition">Mock 모드</button>
         <button type="button" id="btnLiveMode" class="px-3 py-1 rounded-md font-semibold text-slate-400 hover:text-white transition">Live API</button>
       </div>
+      <select id="mockDataset" class="ml-1 bg-slate-900 text-slate-200 border border-slate-700 rounded-md px-2 py-1 text-xs" title="Mock 모드에서 보여 줄 데이터">
+        <option value="sample">기본 샘플 6건</option>
+        <option value="real">실제 녹화 181건</option>
+        <option value="synthetic">합성 5일 197건</option>
+      </select>
     </div>
   </header>
 
@@ -571,6 +576,7 @@
     </div>
   </div>
 
+  <script src="mock_demo_data.js"></script>
   <script>
     // ==========================================
     // 1. 전역 설정 및 상태 관리
@@ -897,6 +903,24 @@
       }
     });
 
+    // ---- Mock 데이터셋 선택 (기본 샘플 / 실제 녹화 / 합성 5일) ----
+    const MOCK_SAMPLE_ALERTS = JSON.parse(JSON.stringify(MOCK_ALERTS));
+    const MOCK_PLAYBOOK_BY_CATEGORY = {};
+    MOCK_SAMPLE_ALERTS.forEach(a => { if (a.playbook && !MOCK_PLAYBOOK_BY_CATEGORY[a.category]) MOCK_PLAYBOOK_BY_CATEGORY[a.category] = a.playbook; });
+    function hydrateDemoAlerts(list) {
+      return (list || []).map(a => {
+        const copy = JSON.parse(JSON.stringify(a));
+        const pb = MOCK_PLAYBOOK_BY_CATEGORY[copy.category];
+        copy.playbook = pb ? JSON.parse(JSON.stringify(pb)) : null;
+        return copy;
+      });
+    }
+    function setMockDataset(name) {
+      const source = name === "real" ? window.DEMO_REAL_ALERTS : name === "synthetic" ? window.DEMO_SYNTHETIC_ALERTS : MOCK_SAMPLE_ALERTS;
+      const next = name === "sample" || !source ? JSON.parse(JSON.stringify(MOCK_SAMPLE_ALERTS)) : hydrateDemoAlerts(source);
+      MOCK_ALERTS.splice(0, MOCK_ALERTS.length, ...next);
+    }
+
     // ==========================================
     // 2. 보안 유틸리티 (XSS 차단 + CLI 인젝션 방어)
     // ==========================================
@@ -1110,7 +1134,7 @@
 
       fetchLiveStatus();
       try {
-        const res = await fetch(`${API_BASE}/api/alerts?limit=50`);
+        const res = await fetch(`${API_BASE}/api/alerts?limit=200`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         if (!data || !Array.isArray(data.items)) {
@@ -2431,6 +2455,19 @@ function renderTopology(items, selected, targetId = "topologySvgContainer") {
         e.target.value = "";
       }
     });
+
+    document.getElementById("mockDataset").addEventListener("change", (e) => {
+      setMockDataset(e.target.value);
+      clearDetailPanel();
+      if (!isLiveMode) fetchDashboardData();
+    });
+    (function initMockDatasetFromUrl() {
+      const wanted = new URLSearchParams(location.search).get("mock");
+      if (wanted === "real" || wanted === "synthetic") {
+        document.getElementById("mockDataset").value = wanted;
+        setMockDataset(wanted);
+      }
+    })();
 
     document.getElementById("btnMockMode").addEventListener("click", () => {
       isLiveMode = false;
