@@ -25,7 +25,7 @@ SK쉴더스 루키즈 07기 미니프로젝트 04조가, 팀 전용 Docker 실�
 2. **평문 패스워드·토큰 자동 마스킹**  
    URL이나 로그에 보이는 `password`, `token`, `secret` 등 민감 값은 저장·표시 전에 `[MASKED]`로 바꿉니다. 실습 데이터에도 실제 비밀번호를 넣지 않습니다.
 3. **경보 클릭 시 OSI 흐름과 검증·차단·원복 CLI 안내**  
-   `playbooks.json`을 `category`로 매칭해 공격 경로를 보여 주고, `{{SRC_IP}}`, `{{DEST_IP}}`, `{{DEST_PORT}}`를 실제 값으로 치환한 검증(`verify`)·차단(`block`)·원복(`rollback`) 명령어를 복사할 수 있게 합니다. **차단 명령은 화면에 안내만 하며, 시스템이 iptables 등을 실행하지 않습니다.**
+   `playbooks.json`을 `category`로 매칭해 공격 경로를 보여 주고, `{{SRC_IP}}`, `{{DEST_IP}}`, `{{DEST_PORT}}`를 실제 값으로 치환한 검증(`verify`)·차단(`block`)·원복(`rollback`) 명령어를 복사할 수 있게 합니다. **차단 명령은 화면에 안내만 합니다. 호스트 방화벽(iptables 등)은 실행하지 않습니다. 단, 실습망의 `attacker` 컨테이너를 사용자가 승인했을 때만 네트워크에서 분리(`docker network disconnect`)하는 격리 기능이 있으며 `ISOLATION_ENABLED=1`일 때만 동작합니다.**
 4. **업로드한 PCAP을 커스텀 룰로 검사하고 MITRE 커버리지를 보여 줌**  
    웹에서 pcap을 올리면 백엔드가 `suricata -r`과 `rules/custom.rules`로 오프라인 분석합니다. 대시보드는 `GET /api/stats`로 심각도 집계와 MITRE ATT&CK 커버리지를 표시합니다.
 
@@ -80,8 +80,11 @@ Stage 1에서 프론트·백엔드가 맞출 인터페이스입니다. 앞의 �
 | `POST` | `/api/pcap/upload` | pcap 업로드 후 `suricata -r` | `multipart/form-data`, `.pcap` 또는 `.pcapng`, 최대 20MB | 분석 요약(적재 건수 등) |
 | `GET` | `/api/stats` | 심각도 집계, MITRE 커버리지, 로그 단절(Blind) 룰 | `include_fp`(`0`/`1`, 기본 `0`) | `severity_counts`, `mitre_coverage`, `blind_rules` 등 (집계도 기본은 FP 제외) |
 | `GET` | `/api/live/status` | (선택 기능, 기본 꺼짐) 라이브 캡처 상태·시작/중지 안내 | 없음 | `enabled`, `eve_path`, `offset`, `last_poll_at`, `rows_stored`, `rows_skipped_out_of_scope`, `last_error`, `start_command`, `stop_command` |
+| `POST` | `/api/isolate` | (선택 기능, 기본 꺼짐) 승인된 격리 실행 | JSON `alert_id`, `token`(1회용) | `status`, `ip`, `container` |
+| `POST` | `/api/unisolate` | (선택 기능, 기본 꺼짐) 격리 해제 | JSON `alert_id` 또는 `ip` 중 하나 | `status`, `ip`, `container` |
+| `GET` | `/api/isolation/status` | 격리 상태 조회(읽기 전용, 꺼져 있어도 응답) | 없음 | `enabled`, `allowed_ips`, `isolated_ips`, `source`, `docker_error`, `recent` |
 
-경보 JSON의 핵심 키는 `id`, `timestamp`, `sid`, `category`, `signature`, `mitre_id`, `src_ip`, `dest_ip`, `dest_port`, `http_status`, `severity`, `is_confirmed_risk`, `pii_masked`, `raw_url`, `verdict`, `observation`, `assessment`, `confidence`, `analyst`, `action_status`, `playbook`입니다. 스키마 상세는 [ARCHITECTURE.md](docs/ARCHITECTURE.md)를 참고하세요.
+경보 JSON의 핵심 키는 `id`, `timestamp`, `sid`, `category`, `signature`, `mitre_id`, `src_ip`, `dest_ip`, `dest_port`, `http_status`, `severity`, `is_confirmed_risk`, `pii_masked`, `raw_url`, `verdict`, `observation`, `assessment`, `confidence`, `analyst`, `action_status`, `isolation_token`(조건 불충족이면 `null`), `playbook`입니다. 스키마 상세는 [ARCHITECTURE.md](docs/ARCHITECTURE.md)를 참고하세요.
 
 ### 선택 기능: 라이브 캡처 ingest (기본 꺼짐, 팀 합의 후 사용)
 
@@ -92,6 +95,16 @@ Backlog의 Stage 2 항목을 **선택 기능**으로 미리 구현해 둔 것입
 - 이미 저장한 경보의 `http` 응답이 나중 배치에 도착하면 `http_status`·심각도(200이면 SEV1)만 갱신하며, 같은 줄을 다시 읽어도 중복 저장되지 않습니다.
 - 터미널은 Windows에서 PowerShell → `wsl -d Ubuntu` → `cd ~/RookiRooki` 순서로 엽니다. 백엔드 `uvicorn`은 `(서버_터미널.1)`(`.venv` 필요)에서 `--reload` 없이 프로세스 1개로 실행하고, 요청은 `(요청_터미널.3)`, 트래픽은 `(attacker_터미널.4)`, Suricata는 `(라이브_터미널.8)`(`.venv` 불필요)에서 실행합니다.
 - 시작·중지 명령, 터미널별 역할, offset·중복 규칙, 한계는 [docs/live_capture_guide.md](docs/live_capture_guide.md)를 참고하세요.
+
+### 선택 기능: 승인 기반 격리 (기본 꺼짐)
+
+실습망의 `attacker` 컨테이너 **한 대**(`172.28.0.100`, 네트워크 `mini-siem-net`)만 대상으로, 분석가가 **승인했을 때만** 네트워크에서 분리(`docker network disconnect`)하는 기능입니다. 환경변수 `ISOLATION_ENABLED=1`을 직접 지정할 때만 동작하며, 지정하지 않으면 docker를 한 번도 호출하지 않고 `isolation_token`은 항상 `null`입니다.
+
+- **승인 흐름:** 경보 조회 응답의 `isolation_token`(경보당 하나) → 분석가가 확인 화면에서 승인 → `POST /api/isolate`(`alert_id`, `token`)만 격리를 실행합니다. 조회·적재·라이브 캡처는 절대 격리하지 않습니다.
+- **토큰 조건:** SEV1이고, `src_ip`가 `172.28.0.100`이며, 경보 시각이 5분 이내인 경보에만 발급됩니다. 토큰은 1회용이고 10분 뒤 만료됩니다(서버 메모리에만 있고 서버를 다시 켜면 사라집니다).
+- **허용 목록 밖은 거절:** `172.28.0.10`, `172.28.0.11`, 실습망 밖 IP 등은 403이며 docker를 호출하지 않습니다.
+- **해제는 수동:** 자동 해제(타이머)는 없습니다. `POST /api/unisolate`(`alert_id` 또는 `ip` 중 하나)로 해제하며, 해제 뒤 IP가 `172.28.0.100`으로 유지되는지 서버가 확인합니다. 그래도 실제 컨테이너의 IP 유지는 사람이 한 번 더 확인해야 합니다(자세한 절차는 [backend/README.md](backend/README.md)).
+- **실행 조건:** 격리를 켠 서버는 `--host 0.0.0.0`으로 열지 않고(기본 `127.0.0.1` 유지), `--reload`·`--workers` 없이 프로세스 1개로 실행합니다(토큰이 메모리에 있음). 사용자 계정이 `docker` 그룹이어야 하며 이는 문서로만 안내합니다.
 
 ## 저장소 구조
 
@@ -190,7 +203,7 @@ PM이 `policies/sev_sla_policy.json`으로 관리합니다. 초안 기준은 다
 
 - 공격 재현과 패킷 수집은 **이 팀의 격리된 Docker 실습망에서만** 합니다. 학교·회사·가정 네트워크나 허가 없는 대상을 쓰지 않습니다.
 - 샘플 로그와 pcap에는 실제 계정, 실제 비밀번호, 실제 개인정보를 넣지 않습니다. 마스킹 시험에는 가짜 `password=` / `token=`만 사용합니다.
-- 문서에 적힌 차단 명령은 안내입니다. 실습망 밖 장비에 적용하지 않습니다.
+- 문서에 적힌 차단 명령은 안내입니다. 실습망 밖 장비에 적용하지 않습니다. 격리 기능의 대상은 `172.28.0.100`의 `attacker` 컨테이너뿐이며 허용 목록 밖의 IP는 거절됩니다.
 - 샘플 출발지·문서 예시가 필요하면 RFC 5737 문서용 대역(`192.0.2.0/24`, `198.51.100.0/24`, `203.0.113.0/24`)만 쓰고, 실공인 IP는 사용하지 않습니다.
 
 ## 추가 목표 (Stretch Goals, 시간 남으면)
@@ -205,7 +218,7 @@ PM이 `policies/sev_sla_policy.json`으로 관리합니다. 초안 기준은 다
 
 **목적.** 프롬프트나 대시보드를 계속 보지 않아도, 새 위협을 메신저로 받고 웹 경보 화면으로 바로 이동하며, 임시 대응 안내를 확인합니다.
 
-**최소 구현 범위 (MVP).** Discord 또는 Slack 웹훅으로 새 경보 요약을 보내고, 메시지에 해당 경보 딥링크를 붙입니다. 메시지의 「임시 대응」은 **기존 검증·차단·원복 명령 안내 화면으로 가는 버튼(또는 링크)**입니다. 시스템이 iptables 등을 실행하지 않습니다.
+**최소 구현 범위 (MVP).** Discord 또는 Slack 웹훅으로 새 경보 요약을 보내고, 메시지에 해당 경보 딥링크를 붙입니다. 메시지의 「임시 대응」은 **기존 검증·차단·원복 명령 안내 화면으로 가는 버튼(또는 링크)**입니다. 호스트 방화벽 명령은 실행하지 않습니다(격리 승인 화면으로의 링크는 가능).
 
 **동작 방식.** 경보를 저장한 뒤, 환경변수 `SIEM_WEBHOOK_URL`이 있을 때만 HTTP로 웹훅을 보냅니다. URL은 코드·저장소·문서 예시에 실주소를 넣지 않습니다. 페이로드는 Discord의 `content`와 Slack의 `text`를 함께 담을 수 있습니다. 딥링크 예시는 `http://localhost:8000/?alert_id=101`입니다. 오탐 점수가 3 이상인 키는 알림만 생략하고(아래 2절), 200 OK로 SEV1 격상된 건은 항상 알립니다.
 
@@ -215,7 +228,7 @@ PM이 `policies/sev_sla_policy.json`으로 관리합니다. 초안 기준은 다
 
 - 웹훅 주소를 하드코딩하지 않습니다. 실제 URL·토큰을 커밋하지 않습니다.
 - `localhost` 딥링크는 다른 기기나 모바일 메신저에서 열리지 않을 수 있습니다. 시연은 백엔드를 연 같은 호스트에서 확인합니다.
-- 「임시 대응」은 안내 링크뿐입니다. 제미나이 초안의 임시 차단 API와 10분 자동 차단·원복은 **실제 실행이므로 Backlog**로 둡니다.
+- 임시 차단 API 중 **승인 기반 격리(`attacker` 컨테이너 분리)와 수동 해제는 구현됨**. **자동 차단·10분 자동 원복·호스트 방화벽 실행은 Backlog**로 둡니다.
 
 **담당 역할.** 백엔드(웹훅 발송), 프론트엔드(딥링크·경보 상세의 대응 안내), PM(시연 채널·비밀 관리).
 
@@ -304,7 +317,7 @@ grep '172.28.0.100' /var/log/nginx/access.log | tail -n 20
 ## Backlog (4일 범위 밖)
 
 - **Stage 2:** 브리지에서 Suricata를 상시 실행하고 `eve.json`을 실시간으로 읽기
-- 시스템이 방화벽 명령을 직접 실행하는 임시 차단(지금은 화면 안내만)
+- 호스트 방화벽(iptables 등)을 직접 실행하는 임시 차단, 자동 차단·자동 해제(승인 기반 컨테이너 격리는 구현됨)
 - 위 [추가 목표](#추가-목표-stretch-goals-시간-남으면) 가운데 Day 3 18:00 동결 전까지 넣지 못한 항목
 - 웹에서 룰 텍스트를 바꿔 시험하는 샌드박스(`POST /api/sandbox/test`)
 - 호스트 로그(`auth.log` 등)와의 추가 상관분석, 로그인·다중 권한, 상용 DB 전환

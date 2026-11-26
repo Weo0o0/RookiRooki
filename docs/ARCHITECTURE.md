@@ -2,7 +2,7 @@
 
 이 문서는 04조 Mini-SIEM의 구성 요소, 실습망, 데이터 흐름, 탐지 규칙, 데이터 저장 구조를 정리합니다. 제품 개요와 일정은 [README.md](../README.md)를 참고하세요. 백엔드(FastAPI)와 프론트엔드(`frontend/index.html`)는 `main`에 구현되어 있으며, 여기서는 팀이 합의한 설계를 정리합니다.
 
-Stage 1(이번 4일)은 격리된 Docker 실습망에서 tcpdump로 녹화된 pcap을 업로드해 Suricata가 오프라인으로 분석하는 경로입니다. Stage 2(브리지에 Suricata를 상시 배치)는 Backlog입니다. 시스템이 차단 명령을 실행하는 기능도 Backlog이며, Stage 1의 차단은 대시보드에 표시하는 명령 안내뿐입니다.
+Stage 1(이번 4일)은 격리된 Docker 실습망에서 tcpdump로 녹화된 pcap을 업로드해 Suricata가 오프라인으로 분석하는 경로입니다. Stage 2(브리지에 Suricata를 상시 배치)는 Backlog입니다. 호스트 방화벽 실행·자동 차단은 Backlog입니다. 대시보드의 차단 명령은 안내이고, 별도로 승인 기반 격리(`attacker` 컨테이너)가 선택 기능으로 있습니다.
 
 ## 1. 구성 요소
 
@@ -103,6 +103,31 @@ sequenceDiagram
 
 업로드 API는 `.pcap` 또는 `.pcapng`만 받고, 크기는 20MB를 넘지 못하게 합니다. Suricata 호출은 셸 문자열 결합이 아니라 인자 목록으로 실행합니다. Stage 2에서는 이 파서를 그대로 두고, 입력만 실시간 `eve.json`으로 바꿀 수 있게 설계합니다.
 
+### 승인 기반 격리 (선택 기능, `ISOLATION_ENABLED=1`일 때만)
+
+경보 조회 응답에 토큰이 들어 있고, 격리는 분석가가 승인해 `POST /api/isolate`를 호출할 때만 실행됩니다. 허용 대상은 `172.28.0.100`의 `attacker` 컨테이너 하나(네트워크 `mini-siem-net`)입니다.
+
+```mermaid
+sequenceDiagram
+  actor Analyst as "분석가"
+  participant UI as "승인 화면"
+  participant API as "FastAPI"
+  participant Docker as "docker CLI"
+  participant DB as "SQLite"
+
+  UI->>API: GET /api/alerts (isolation_token 포함)
+  API-->>UI: SEV1 허용 IP 5분 이내 경보에만 토큰
+  Analyst->>UI: 승인
+  UI->>API: POST /api/isolate (alert_id, token)
+  API->>API: 토큰 검사 (1회용, 10분)
+  API->>Docker: inspect, network disconnect
+  Docker-->>API: 결과
+  API->>DB: isolation_log 기록
+  API-->>UI: isolated 또는 오류 detail
+```
+
+자동 해제는 없고, `POST /api/unisolate`로 수동 해제합니다.
+
 ## 4. 시나리오별 탐지 논리
 
 룰 문구는 룰 담당자가 `custom.rules`에 작성하고, 메타데이터는 `rule_catalog.json`에 둡니다. 아래는 Stage 1에서 합의한 탐지 관점입니다. MITRE ID는 초안이며 룰 담당자가 검증합니다.
@@ -126,7 +151,7 @@ sequenceDiagram
 
 ## 5. SQLite 스키마
 
-Stage 1의 핵심 테이블은 `alerts`입니다. 트리아지 필드는 팀 가이드와 같습니다. 오탐 학습 점수 테이블은 기본 계약이 아니며, 추가 목표로 넣을 때의 위치는 [7절](#7-추가-목표-확장-지점)을 참고하세요. 자동 차단 이력 테이블은 Backlog입니다.
+Stage 1의 핵심 테이블은 `alerts`입니다. 트리아지 필드는 팀 가이드와 같습니다. 오탐 학습 점수 테이블은 기본 계약이 아니며, 추가 목표로 넣을 때의 위치는 [7절](#7-추가-목표-확장-지점)을 참고하세요. `isolation_log` 테이블(격리·해제 이력)이 있고, **자동** 차단 이력 테이블(`temp_blocks`)은 Backlog입니다.
 
 ```sql
 CREATE TABLE IF NOT EXISTS alerts (
@@ -154,6 +179,21 @@ CREATE TABLE IF NOT EXISTS alerts (
 );
 ```
 
+격리·해제 이력은 `isolation_log`에 남깁니다(토큰은 저장하지 않음).
+
+```sql
+CREATE TABLE IF NOT EXISTS isolation_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    alert_id INTEGER,
+    ip TEXT,
+    container TEXT,
+    action TEXT NOT NULL,     -- 'isolate' | 'unisolate'
+    result TEXT NOT NULL,     -- 'ok' | 'fail'
+    detail TEXT,
+    created_at TEXT NOT NULL  -- UTC ISO 8601
+);
+```
+
 옛 DB는 서버 시작 시 `ALTER TABLE ... ADD COLUMN`으로 자동 보정됩니다(멱등).
 
 | 컬럼 | 설명 |
@@ -173,7 +213,7 @@ CREATE TABLE IF NOT EXISTS alerts (
 
 `rule_catalog.json` 항목 키는 `sid`, `category`, `title`, `status`, `mitre_tactic`, `mitre_id`, `base_severity`, `escalated_severity`, `data_sources`, `false_positives`, `validation_pcap`, `notes`를 유지합니다. `playbooks.json`의 최상위 키는 여섯 카테고리와 같고, 각 항목에 OSI 설명, 흐름, `preserve_evidence_first`, 장비별 `verify` / `block` / `rollback`을 둡니다. 주소와 포트는 `{{SRC_IP}}`, `{{DEST_IP}}`, `{{DEST_PORT}}`만 사용합니다.
 
-차단 안내 예시는 화면용입니다. 시스템이 실행하지 않습니다.
+이 안내 명령은 화면용이며 백엔드는 이 명령을 실행하지 않습니다. 컨테이너 격리는 별도 API로 수행합니다.
 
 ```text
 verify:    sudo iptables -L INPUT -n | grep {{SRC_IP}}
@@ -189,8 +229,8 @@ ufw를 쓰는 환경이면 같은 세 단계(확인·차단·원복)를 플레�
 |---|---|
 | 시나리오 | 실습망 구성, 브리지 tcpdump, 6종 pcap(가능하면 정상/공격 분리), `sample_eve.json`, `playbooks.json` |
 | 룰 | 6종 `custom.rules`, 카탈로그, MITRE ID 검증, 우회·오탐 메모, pcap으로 룰 확인 |
-| 백엔드 | 업로드·샘플 적재, 파싱, 마스킹, 요청 단위 200 격상, API, Suricata 호출 시 파일 크기·확장자 검사 |
-| 프론트엔드 | 목록·상세, Mock/Live, 플레이북 치환과 복사, 사실/추정 트리아지, 커버리지 표시. 차단 버튼으로 호스트 명령을 실행하지 않음 |
+| 백엔드 | 업로드·샘플 적재, 파싱, 마스킹, 요청 단위 200 격상, API, Suricata 호출 시 파일 크기·확장자 검사, 승인 토큰 발급·검증, 격리/해제 API(허용 목록) |
+| 프론트엔드 | 목록·상세, Mock/Live, 플레이북 치환과 복사, 사실/추정 트리아지, 커버리지 표시. 차단 버튼으로 호스트 명령을 실행하지 않음. 승인 화면(`isolate.html`)이 토큰을 URL fragment로 받아 호출 |
 | PM | SLA와 QA, 키·SID 계약 준수 확인, 시연 범위가 Stage 1을 넘지 않게 관리 |
 
 백엔드와 프론트는 구현 시작 전에 이 문서의 API와 `alerts` 컬럼을 기준으로 맞춥니다. 카테고리 키나 SID를 바꿔야 하면 백엔드와 PM을 거쳐 가이드·프롬프트까지 함께 수정합니다.
@@ -218,9 +258,9 @@ flowchart LR
 
 | 확장 | 연결 지점 | 선택 스키마·API | 하지 않는 것 |
 |---|---|---|---|
-| 알림봇 | 저장 직후, `SIEM_WEBHOOK_URL`이 있을 때만 | 전용 테이블 없음. 딥링크는 대시보드 경보 상세 | 웹훅 URL 하드코딩. 임시 대응의 실제 차단 실행 |
+| 알림봇 | 저장 직후, `SIEM_WEBHOOK_URL`이 있을 때만 | 전용 테이블 없음. 딥링크는 대시보드 경보 상세 | 웹훅 URL 하드코딩. 호스트 방화벽 실행. 승인 없는 자동 격리 |
 | 오탐 학습 | 저장 후 알림 직전 점수 조회, 상세 화면 버튼 | 테이블 `fp_scores`(`composite_key`, `sid`, `src_ip`, `uri_path`, `score`, `updated_at`). `POST /api/alerts/{id}/fp-learn` | 200 OK SEV1 알림 생략. 다른 `src_ip` 점수 변경. 경보 삭제 |
 | 공격 스토리 | 목록과 별도 조회 | 선택 컬럼 `alerts.story_key`. `GET /api/stories` | 무관한 IP간 묶기 |
 | 명령어 해설 | 기존 `GET /api/alerts/{id}`의 `playbook` | 플레이북에 분석 명령·토큰 해설. 새 테이블 없음 | 명령 자동 실행 |
 
-실제 방화벽 실행과 `temp_blocks` 테이블은 Backlog입니다.
+호스트 방화벽 실행, 자동 차단과 `temp_blocks` 테이블은 Backlog입니다(승인 기반 컨테이너 격리는 구현됨).

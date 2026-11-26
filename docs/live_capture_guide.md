@@ -2,6 +2,7 @@
 
 > 이 기능은 README Backlog의 Stage 2 항목이며 **팀 합의 전까지 기본 꺼짐**입니다. `LIVE_CAPTURE_ENABLED=1`을 직접 지정한 경우에만 동작하고, 지정하지 않으면 기존 pcap 업로드·샘플 적재 흐름과 코드 경로가 완전히 같습니다(스레드 없음, 새 테이블 쓰기 없음).
 > 공격 트래픽과 캡처는 **팀 격리 Docker 실습망(`172.28.0.0/24`) 안에서만** 합니다.
+> 컨테이너 격리는 이 기능과 별개이며 `ISOLATION_ENABLED=1`로 따로 켭니다.
 
 ## 1. 동작 구조
 
@@ -10,6 +11,7 @@ Suricata(라이브, br-minisiem) → backend/data/live/eve.json → 백엔드 �
 ```
 
 - 백엔드는 **Suricata를 시작하거나 멈추지 않으며 `sudo`를 호출하지 않습니다.** 브리지에서 라이브 캡처하려면 root 권한이 필요한데 백엔드가 `sudo` 권한을 갖게 하지 않기 위해, 시작·중지는 **사용자가 자기 Ubuntu 터미널에서 직접** 실행하는 안내 방식으로 정했습니다.
+- 격리 기능은 `docker` 명령만 호출하며(`sudo` 없음, 사용자 계정이 `docker` 그룹이어야 함), Suricata는 여전히 건드리지 않습니다. 격리를 켠 서버는 `127.0.0.1` 바인딩, `--reload`·`--workers` 없는 단일 프로세스로 실행합니다.
 - 백엔드는 `eve.json`만 읽습니다. `LIVE_POLL_SECONDS`(기본 2초)마다 저장해 둔 offset 이후의 **줄바꿈으로 끝난 완전한 줄만** 읽어 임시 파일에 쓰고, 기존 `parse_eve`로 파싱합니다(파싱·마스킹·SEV1 격상 규칙은 pcap 업로드와 동일).
 - 저장은 `ingest_eve`와 같은 `INSERT OR IGNORE` SQL을 씁니다. `ingest_sources`, `ingest_meta`는 건드리지 않으므로 `/api/stats`의 `blind_rules` 계산은 바뀌지 않습니다.
 
