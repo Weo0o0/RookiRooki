@@ -26,6 +26,7 @@ EXPECTED_ALERT_KEYS = [
     "confidence",
     "analyst",
     "action_status",
+    "isolation_token",
     "playbook",
 ]
 

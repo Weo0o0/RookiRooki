@@ -15,7 +15,7 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from . import live_capture
+from . import isolation, live_capture
 from .eve_parser import extract_event_types, mask_text, parse_eve
 
 MAX_UPLOAD_BYTES = 20 * 1024 * 1024
@@ -60,6 +60,7 @@ ALERT_KEYS = (
     "confidence",
     "analyst",
     "action_status",
+    "isolation_token",
     "playbook",
 )
 
@@ -97,6 +98,18 @@ class TriageUpdate(BaseModel):
     assessment: Optional[str] = Field(None, max_length=2000)
     analyst: Optional[str] = Field(None, max_length=ANALYST_MAX_LEN)
     action_status: Optional[Literal["ISOLATED", "GUIDE_ONLY", "NONE"]] = None
+
+class IsolateRequest(BaseModel):
+    model_config = {"extra": "forbid"}
+
+    alert_id: int
+    token: str = Field(..., min_length=1, max_length=200)
+
+class UnisolateRequest(BaseModel):
+    model_config = {"extra": "forbid"}
+
+    alert_id: Optional[int] = None
+    ip: Optional[str] = Field(None, max_length=45)
 
 def config(name, default):
     return Path(os.getenv(name, str(default)))
@@ -172,6 +185,7 @@ def init_db():
         )
         db.execute("CREATE TABLE IF NOT EXISTS ingest_sources (source TEXT PRIMARY KEY)")
         db.execute("CREATE TABLE IF NOT EXISTS ingest_meta (key TEXT PRIMARY KEY, value TEXT)")
+        db.execute(isolation.ISOLATION_LOG_DDL)
         db.commit()
 
 INSERT_KEYS = (
@@ -307,6 +321,7 @@ def build_alert_dict(row, playbooks: Dict[str, Any]) -> Dict[str, Any]:
         "confidence": row["confidence"],
         "analyst": row["analyst"],
         "action_status": row["action_status"],
+        "isolation_token": isolation.issue_token(row),
         "playbook": playbook_entry,
     }
 
@@ -510,6 +525,39 @@ def update_triage(alert_id: int, payload: TriageUpdate):
         row = db.execute("SELECT * FROM alerts WHERE id = ?", (alert_id,)).fetchone()
 
     return build_alert_dict(row, playbooks)
+
+@app.post("/api/isolate")
+def post_isolate(payload: IsolateRequest):
+    if not isolation.enabled():
+        raise HTTPException(403, detail="Isolation is disabled")
+    init_db()
+    with closing(sqlite3.connect(db_path())) as db:
+        db.row_factory = sqlite3.Row
+        try:
+            return isolation.isolate(db, payload.alert_id, payload.token)
+        except isolation.IsolationError as exc:
+            raise HTTPException(exc.status_code, detail=exc.detail)
+
+@app.post("/api/unisolate")
+def post_unisolate(payload: UnisolateRequest):
+    if (payload.alert_id is None) == (payload.ip is None):
+        raise HTTPException(422, detail="Exactly one of alert_id or ip is required")
+    if not isolation.enabled():
+        raise HTTPException(403, detail="Isolation is disabled")
+    init_db()
+    with closing(sqlite3.connect(db_path())) as db:
+        db.row_factory = sqlite3.Row
+        try:
+            return isolation.unisolate(db, alert_id=payload.alert_id, ip=payload.ip)
+        except isolation.IsolationError as exc:
+            raise HTTPException(exc.status_code, detail=exc.detail)
+
+@app.get("/api/isolation/status")
+def get_isolation_status():
+    init_db()
+    with closing(sqlite3.connect(db_path())) as db:
+        db.row_factory = sqlite3.Row
+        return isolation.status(db)
 
 @app.get("/api/live/status")
 def live_status():
