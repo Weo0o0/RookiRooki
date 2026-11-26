@@ -125,11 +125,11 @@ flowchart LR
 3. **백엔드**  
    ```bash
    pip install -r backend/requirements.txt
-   uvicorn backend.main:app --reload --port 8000
+   uvicorn backend.main:app --port 8000
    ```
-   API 문서는 `http://localhost:8000/docs`에서 확인합니다. 샘플 로그는 `POST /api/ingest/sample`, 녹화 파일은 `POST /api/pcap/upload`로 넣습니다.
+   API 문서는 `http://localhost:8000/docs`에서 확인합니다. 샘플 로그는 `POST /api/ingest/sample`, 녹화 파일은 `POST /api/pcap/upload`로 넣습니다. 라이브 캡처·격리 기능을 켠 서버는 `--reload`를 쓰지 않습니다.
 4. **대시보드**  
-   `cd frontend && python3 -m http.server 5500`으로 서버를 띄우고 `http://localhost:5500`에 접속합니다(`ALLOWED_ORIGINS` 때문에 `file://`로 열면 CORS 오류가 납니다). 백엔드가 준비되면 Mock 모드를 끄고 Live API(`http://localhost:8000`)에 연결합니다.
+   `cd frontend && python3 -m http.server 5500 --bind 127.0.0.1`으로 서버를 띄우고 `http://localhost:5500`에 접속합니다(`ALLOWED_ORIGINS` 때문에 `file://`로 열면 CORS 오류가 납니다). 백엔드가 준비되면 Mock 모드를 끄고 Live API(`http://localhost:8000`)에 연결합니다.
 
 ## 문서 안내
 
@@ -299,14 +299,14 @@ Backlog의 Stage 2 항목으로 기획되었던 브리지 실시간 eve.json 수
 
 ## 4일 일정
 
-Day 3 **오후 6시 Feature Freeze** 이후에는 새 기능을 넣지 않고, 버그 수정과 시연 준비만 합니다.
+Feature Freeze는 11/26(목) 18:00으로 옮겼습니다(기존 Day 3 18:00). 동결 이후에는 새 기능을 넣지 않고, 버그 수정과 시연 준비만 합니다. 11/27(금)은 발표일이며 버그 수정만 합니다.
 
 | 일정 | 목표 | 역할별 작업 |
 |---|---|---|
-| Day 1 | 계약 고정과 뼈대 | 전원이 카테고리 키·SID·API를 확인. 백엔드: 프로젝트 뼈대와 샘플 적재. 프론트: Mock으로 경보 목록·상세 레이아웃. 룰: 6종 1차 룰과 카탈로그. 시나리오: 실습망·1차 pcap과 플레이북 초안. PM: SLA 정책과 QA 목록 |
-| Day 2 | 탐지와 화면 연동 | 백엔드: pcap 업로드, 마스킹, SQL/XSS 200 격상. 프론트: Live API, 플레이북 치환, 트리아지(사실/추정 분리). 룰: pcap으로 튜닝. 시나리오: 정상·공격 트래픽 분리 녹화. PM: 키 일치 점검 |
-| Day 3 | 통합과 동결 | 4시나리오가 업로드부터 대시보드까지 이어지는지 확인. MITRE 요약과 QA PASS/FAIL. **18:00 Feature Freeze** |
-| Day 4 | 시연 | 리허설, README·스크린샷, 발표. 실습망이 안 되면 저장해 둔 pcap과 `sample_eve.json`으로 재현 |
+| Day 1 (11/23) | 계약 고정과 뼈대 | 전원이 카테고리 키·SID·API를 확인. 백엔드: 프로젝트 뼈대와 샘플 적재. 프론트: Mock으로 경보 목록·상세 레이아웃. 룰: 6종 1차 룰과 카탈로그. 시나리오: 실습망·1차 pcap과 플레이북 초안. PM: SLA 정책과 QA 목록 |
+| Day 2 (11/24) | 탐지와 화면 연동 | 백엔드: pcap 업로드, 마스킹, SQL/XSS 200 격상. 프론트: Live API, 플레이북 치환, 트리아지(사실/추정 분리). 룰: pcap으로 튜닝. 시나리오: 정상·공격 트래픽 분리 녹화. PM: 키 일치 점검 |
+| Day 3 (11/25) | 통합과 동결 | 6종 시나리오가 업로드부터 대시보드까지 이어지는지 확인. MITRE 요약과 QA PASS/FAIL. (Feature Freeze는 11/26 18:00으로 이동) |
+| Day 4 (11/26) | 시연 준비 | 리허설, README·스크린샷, 발표 준비. **18:00 Feature Freeze**. 실습망이 안 되면 저장해 둔 pcap과 `sample_eve.json`으로 재현 |
 
 ## 심각도 SLA
 
@@ -319,7 +319,7 @@ PM이 `policies/sev_sla_policy.json`으로 관리합니다. 초안 기준은 다
 | SEV3 | 포트 스캔, 응답이 200이 아닌 웹 공격 시도 | 1시간 이내 | 2시간마다 |
 | SEV4 | 정보성·오탐 튜닝 대상 | 다음 영업일 이내 | 일일 요약 |
 
-자동 격상: SQL 인젝션·XSS·SSRF에서 **그 요청의 응답이 200**이면 즉시 SEV1. 평문 패스워드·토큰이 보이면 마스킹하고, 정책상 최소 SEV2 이상을 검토합니다. SEV1 선언 후 30분 안에 원인을 못 찾으면 상위 보고를 검토합니다.
+자동 격상: SQL 인젝션·XSS·SSRF에서 **그 요청의 응답이 200**이면 즉시 SEV1. 평문 패스워드·토큰이 보이면 `[MASKED]`로 마스킹만 하며(`pii_masked=1`), 마스킹 때문에 심각도를 올리거나 바꾸지는 않습니다(팀 결정). SEV1 선언 후 30분 안에 원인을 못 찾으면 상위 보고를 검토합니다.
 
 ## 추가 목표 (Stretch Goals) 및 구현 완료 항목
 
@@ -345,7 +345,7 @@ PM이 `policies/sev_sla_policy.json`으로 관리합니다. 초안 기준은 다
 
 **구현 범위.** `playbooks.json`의 `analysis` 필드를 통해 분석용 명령어(`grep`, `tail` 등)와 `{{SRC_IP}}` 등의 동적 치환, 토큰별 한글 해설을 대시보드 상세 화면에 제공합니다.
 
-### 4. 오탐 학습 버튼 [미구현 / Backlog]
+### 4. 오탐 학습 버튼 [미구현(추후 작업)]
 
 **목적.** 분석가가 오탐으로 표시한 패턴에 점수를 쌓아, 반복 오탐은 알림 범위에서 빼 알림 피로를 줄입니다.
 

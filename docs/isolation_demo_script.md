@@ -3,7 +3,7 @@
 | 항목 | 내용 |
 |---|---|
 | 기준 코드 | 최신 main `a9f69b3` (2026-11-26, 격리·트리아지 PR #34·#35·#39 머지 후) |
-| 작성 | 배기윤 (시나리오) |
+| 작성 | 최지웅 (시나리오) |
 | 같이 보는 문서 | `rules/isolation_criteria.md`(격리 기준), `rules/triage_templates.md`(메모), `docs/isolation_rehearsal_log.md`(리허설 기록) |
 | 바꾼 파일 | **없음.** `lab-traffic.sh`, 컨테이너 파일, `backend/`, `frontend/`, `rules/`는 건드리지 않았습니다. |
 | 상태 | 격리 API(PR #35)와 확인 페이지(PR #39)가 main에 들어와 **이제 리허설을 할 수 있습니다.** 아래 화면 문구·버튼 이름은 실제 코드에서 옮겼습니다. 리허설로 확인한 것은 아직 없습니다. |
