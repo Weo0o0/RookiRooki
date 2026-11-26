@@ -103,7 +103,7 @@ flowchart LR
 ## 빠른 시작
 
 1. **설치 및 환경 구축**: [docs/설치_테스트_가이드.md](docs/설치_테스트_가이드.md)를 따라 WSL2 Ubuntu, Python `.venv`, Suricata, Docker 환경을 설치합니다.
-2. **설치 확인**: `python -m pytest backend/tests -q`(`59 passed`), 백엔드(`uvicorn backend.main:app --port 8000`, `:8000`), 프론트엔드(`python3 -m http.server 5500`, `:5500`) 실행을 확인합니다.
+2. **설치 확인**: `python -m pytest backend/tests -q`(`59 passed`), 백엔드(`uvicorn backend.main:app --port 8000`, `:8000`), 프론트엔드(`python3 -m http.server 5500 --bind 127.0.0.1`, `:5500`) 실행을 확인합니다.
 3. **전체 기능 체험**: [docs/RookiRooki_전체기능_체험_종합명령어.md](docs/RookiRooki_전체기능_체험_종합명령어.md) 순서대로 Mock 모드, PCAP 업로드, 6종 라이브 탐지, 트리아지, Discord 알림 및 승인 기반 격리를 체험합니다.
 
 ## 실행 방법
@@ -125,11 +125,11 @@ flowchart LR
 3. **백엔드**  
    ```bash
    pip install -r backend/requirements.txt
-   uvicorn backend.main:app --reload --port 8000
+   uvicorn backend.main:app --port 8000
    ```
-   API 문서는 `http://localhost:8000/docs`에서 확인합니다. 샘플 로그는 `POST /api/ingest/sample`, 녹화 파일은 `POST /api/pcap/upload`로 넣습니다.
+   API 문서는 `http://localhost:8000/docs`에서 확인합니다. 샘플 로그는 `POST /api/ingest/sample`, 녹화 파일은 `POST /api/pcap/upload`로 넣습니다. 라이브 캡처·격리 기능을 켠 서버는 `--reload`를 쓰지 않습니다.
 4. **대시보드**  
-   `cd frontend && python3 -m http.server 5500`으로 서버를 띄우고 `http://localhost:5500`에 접속합니다(`ALLOWED_ORIGINS` 때문에 `file://`로 열면 CORS 오류가 납니다). 백엔드가 준비되면 Mock 모드를 끄고 Live API(`http://localhost:8000`)에 연결합니다.
+   `cd frontend && python3 -m http.server 5500 --bind 127.0.0.1`으로 서버를 띄우고 `http://localhost:5500`에 접속합니다(`ALLOWED_ORIGINS` 때문에 `file://`로 열면 CORS 오류가 납니다). 백엔드가 준비되면 Mock 모드를 끄고 Live API(`http://localhost:8000`)에 연결합니다.
 
 ## 문서 안내
 
@@ -295,18 +295,18 @@ Backlog의 Stage 2 항목으로 기획되었던 브리지 실시간 eve.json 수
 - **실행 조건:** 격리를 켠 서버는 `--host 0.0.0.0`으로 열지 않고(기본 `127.0.0.1` 유지), `--reload`·`--workers` 없이 프로세스 1개로 실행합니다(토큰이 메모리에 있음). 사용자 계정이 `docker` 그룹이어야 하며 이는 문서로만 안내합니다.
 - **Discord 격리 확인 링크:** SEV1 경보에 `isolation_token`이 있을 때만 Discord 알림 embed에 `격리 확인` 링크(`frontend/isolate.html?alert_id=<N>#token=<T>`)가 포함됩니다.
 - **수동 승인 전용:** 확인 페이지는 열기만 해서는 절대 격리하지 않으며(GET 조회만 수행), 화면에서 `[승인(격리 실행)]` 버튼을 눌렀을 때만 `POST /api/isolate`를 호출합니다.
-- **접속 방법 및 주의:** `frontend/`에서 `python3 -m http.server 5500`을 실행해 `http://localhost:5500`으로 열어야 하며, `localhost` 링크는 백엔드가 실행 중인 같은 PC의 브라우저에서만 동작합니다.
+- **접속 방법 및 주의:** `frontend/`에서 `python3 -m http.server 5500 --bind 127.0.0.1`을 실행해 `http://localhost:5500`으로 열어야 하며, `localhost` 링크는 백엔드가 실행 중인 같은 PC의 브라우저에서만 동작합니다.
 
 ## 4일 일정
 
-Day 3 **오후 6시 Feature Freeze** 이후에는 새 기능을 넣지 않고, 버그 수정과 시연 준비만 합니다.
+Feature Freeze는 11/26(목) 18:00으로 옮겼습니다(기존 Day 3 18:00). 동결 이후에는 새 기능을 넣지 않고, 버그 수정과 시연 준비만 합니다. 11/27(금)은 발표일이며 버그 수정만 합니다.
 
 | 일정 | 목표 | 역할별 작업 |
 |---|---|---|
-| Day 1 | 계약 고정과 뼈대 | 전원이 카테고리 키·SID·API를 확인. 백엔드: 프로젝트 뼈대와 샘플 적재. 프론트: Mock으로 경보 목록·상세 레이아웃. 룰: 6종 1차 룰과 카탈로그. 시나리오: 실습망·1차 pcap과 플레이북 초안. PM: SLA 정책과 QA 목록 |
-| Day 2 | 탐지와 화면 연동 | 백엔드: pcap 업로드, 마스킹, SQL/XSS 200 격상. 프론트: Live API, 플레이북 치환, 트리아지(사실/추정 분리). 룰: pcap으로 튜닝. 시나리오: 정상·공격 트래픽 분리 녹화. PM: 키 일치 점검 |
-| Day 3 | 통합과 동결 | 4시나리오가 업로드부터 대시보드까지 이어지는지 확인. MITRE 요약과 QA PASS/FAIL. **18:00 Feature Freeze** |
-| Day 4 | 시연 | 리허설, README·스크린샷, 발표. 실습망이 안 되면 저장해 둔 pcap과 `sample_eve.json`으로 재현 |
+| Day 1 (11/23) | 계약 고정과 뼈대 | 전원이 카테고리 키·SID·API를 확인. 백엔드: 프로젝트 뼈대와 샘플 적재. 프론트: Mock으로 경보 목록·상세 레이아웃. 룰: 6종 1차 룰과 카탈로그. 시나리오: 실습망·1차 pcap과 플레이북 초안. PM: SLA 정책과 QA 목록 |
+| Day 2 (11/24) | 탐지와 화면 연동 | 백엔드: pcap 업로드, 마스킹, SQL/XSS 200 격상. 프론트: Live API, 플레이북 치환, 트리아지(사실/추정 분리). 룰: pcap으로 튜닝. 시나리오: 정상·공격 트래픽 분리 녹화. PM: 키 일치 점검 |
+| Day 3 (11/25) | 통합과 동결 | 6종 시나리오가 업로드부터 대시보드까지 이어지는지 확인. MITRE 요약과 QA PASS/FAIL. (Feature Freeze는 11/26 18:00으로 이동) |
+| Day 4 (11/26) | 시연 준비 | 리허설, README·스크린샷, 발표 준비. **18:00 Feature Freeze**. 실습망이 안 되면 저장해 둔 pcap과 `sample_eve.json`으로 재현 |
 
 ## 심각도 SLA
 
@@ -319,7 +319,7 @@ PM이 `policies/sev_sla_policy.json`으로 관리합니다. 초안 기준은 다
 | SEV3 | 포트 스캔, 응답이 200이 아닌 웹 공격 시도 | 1시간 이내 | 2시간마다 |
 | SEV4 | 정보성·오탐 튜닝 대상 | 다음 영업일 이내 | 일일 요약 |
 
-자동 격상: SQL 인젝션·XSS·SSRF에서 **그 요청의 응답이 200**이면 즉시 SEV1. 평문 패스워드·토큰이 보이면 마스킹하고, 정책상 최소 SEV2 이상을 검토합니다. SEV1 선언 후 30분 안에 원인을 못 찾으면 상위 보고를 검토합니다.
+자동 격상: SQL 인젝션·XSS·SSRF에서 **그 요청의 응답이 200**이면 즉시 SEV1. 평문 패스워드·토큰이 보이면 `[MASKED]`로 마스킹만 하며(`pii_masked=1`), 마스킹 때문에 심각도를 올리거나 바꾸지는 않습니다(팀 결정). SEV1 선언 후 30분 안에 원인을 못 찾으면 상위 보고를 검토합니다.
 
 ## 추가 목표 (Stretch Goals) 및 구현 완료 항목
 
@@ -331,7 +331,7 @@ PM이 `policies/sev_sla_policy.json`으로 관리합니다. 초안 기준은 다
 
 **구현 범위.** Discord 웹훅으로 새 경보 요약을 보내고, 메시지에 해당 경보 딥링크 및 SEV1 경보 시 격리 확인 페이지(`isolate.html`) 링크를 제공합니다.
 
-**동작 방식.** 경보를 저장한 뒤, 환경변수 `SIEM_WEBHOOK_URL`이 있을 때만 HTTP로 웹훅을 보냅니다. URL은 코드·저장소·문서 예시에 실주소를 넣지 않습니다. 딥링크 예시는 `http://localhost:8000/?alert_id=101`입니다. 200 OK로 SEV1 격상된 건은 항상 알립니다. 임시 차단 API 중 **승인 기반 격리(`attacker` 컨테이너 분리)와 수동 해제는 구현 완료**되었습니다.
+**동작 방식.** Discord 알림은 프론트엔드가 브라우저에 입력된 웹훅 주소로 직접 전송합니다(주소는 브라우저 탭 세션에만 저장하며, 코드·저장소·문서 예시에 실주소를 넣지 않습니다). Live API에서 새로 들어온 SEV1 경보와 SEV3에서 SEV1로 격상된 경보(#42)는, 자동 알림이 켜져 있고 웹훅이 설정되어 있으면 경보당 한 번 발송됩니다. 기본 목록에서 숨긴 오탐(FP)은 자동 알림 대상이 아닙니다. 임시 차단 API 중 **승인 기반 격리(`attacker` 컨테이너 분리)와 수동 해제는 구현 완료**되었습니다.
 
 ### 2. 시각적 정보 제공 (공격 스토리 · 계층·경로 · 정상/공격 흐름) [구현 완료]
 
@@ -345,7 +345,7 @@ PM이 `policies/sev_sla_policy.json`으로 관리합니다. 초안 기준은 다
 
 **구현 범위.** `playbooks.json`의 `analysis` 필드를 통해 분석용 명령어(`grep`, `tail` 등)와 `{{SRC_IP}}` 등의 동적 치환, 토큰별 한글 해설을 대시보드 상세 화면에 제공합니다.
 
-### 4. 오탐 학습 버튼 [미구현 / Backlog]
+### 4. 오탐 학습 버튼 [미구현(추후 작업)]
 
 **목적.** 분석가가 오탐으로 표시한 패턴에 점수를 쌓아, 반복 오탐은 알림 범위에서 빼 알림 피로를 줄입니다.
 
