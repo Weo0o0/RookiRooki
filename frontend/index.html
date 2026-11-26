@@ -183,7 +183,7 @@
             <p id="kpiConfirmed" class="text-2xl font-bold mt-1 text-amber-400">0</p>
           </div>
           <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
-            <p class="text-xs text-slate-400">보류(미확정) (UNREVIEWED)</p>
+            <p class="text-xs text-slate-400">미검토 (UNREVIEWED)</p>
             <p id="kpiUnreviewed" class="text-2xl font-bold mt-1 text-sky-400">0</p>
           </div>
         </div>
@@ -213,9 +213,11 @@
               />
               <select id="filterVerdict" class="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-slate-200">
                 <option value="ALL">전체 판정</option>
-                <option value="UNREVIEWED">보류(미확정) (UNREVIEWED)</option>
                 <option value="TP">정탐 (TP)</option>
                 <option value="FP">오탐 (FP)</option>
+                <option value="FN">미탐 (FN · API 미지원)</option>
+                <option value="TN">정미탐 (TN · API 미지원)</option>
+                <option value="UNREVIEWED">미검토 (UNREVIEWED)</option>
               </select>
               <label class="inline-flex items-center gap-1.5 px-2 py-1 text-slate-300 whitespace-nowrap">
                 <input id="includeFpToggle" type="checkbox" class="accent-sky-500" />
@@ -233,10 +235,9 @@
               </select>
               <select id="filterSeverity" class="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-slate-200">
                 <option value="ALL">전체 심각도</option>
-                <option value="SEV1">SEV1</option>
-                <option value="SEV2">SEV2</option>
-                <option value="SEV3">SEV3</option>
-                <option value="SEV4">SEV4</option>
+                <option value="SEV1">SEV 1</option>
+                <option value="SEV2">SEV 2</option>
+                <option value="SEV3">SEV 3</option>
               </select>
             </div>
           </div>
@@ -294,7 +295,7 @@
                 <div>
                   <label class="block text-slate-400 mb-1">판정 (Verdict)</label>
                   <select id="triageVerdict" class="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1.5 text-white">
-                    <option value="UNREVIEWED">보류(미확정) (UNREVIEWED)</option>
+                    <option value="UNREVIEWED">미검토 (UNREVIEWED)</option>
                     <option value="TP">TP (정탐)</option>
                     <option value="FP">FP (오탐)</option>
                   </select>
@@ -490,25 +491,59 @@
           <div class="flex flex-wrap items-center justify-between gap-2">
             <div>
               <h2 class="text-sm font-bold text-slate-100">시간대별 경보 타임라인</h2>
-              <p class="text-xs text-slate-400">심각도(SEV1~4) 누적 분포 · UTC 기준</p>
+              <p class="text-xs text-slate-400">SEV 1~3 분포 · 시간 단위 조회 기간 선택 · 분 단위는 최근 3시간 · 전체 기간은 현재 불러온 경보 기준 · UTC</p>
             </div>
-            <div class="flex items-center bg-slate-950 p-1 rounded-lg border border-slate-800 text-[11px]">
-              <button type="button" id="btnTimelineMin" class="px-2.5 py-1 rounded font-semibold bg-sky-600 text-white transition">분 단위</button>
-              <button type="button" id="btnTimelineHour" class="px-2.5 py-1 rounded font-semibold text-slate-400 hover:text-white transition">시간 단위</button>
+            <div class="flex flex-wrap items-center gap-2">
+              <div class="flex items-center bg-slate-950 p-1 rounded-lg border border-slate-800 text-[11px]">
+                <button type="button" id="btnTimelineMin" class="px-2.5 py-1 rounded font-semibold text-slate-400 hover:text-white transition">분 단위</button>
+                <button type="button" id="btnTimelineHour" class="px-2.5 py-1 rounded font-semibold bg-sky-600 text-white transition">시간 단위</button>
+              </div>
+              <label class="text-[11px] text-slate-400 whitespace-nowrap">
+                조회 기간
+                <select id="timelinePeriodSelect" aria-label="타임라인 시간 단위 조회 기간" class="ml-1 bg-slate-800 border border-slate-700 rounded px-2 py-1 text-slate-200">
+                  <option value="3h" selected>최근 3시간</option>
+                  <option value="24h">최근 24시간</option>
+                  <option value="7d">최근 7일</option>
+                  <option value="all">전체 기간</option>
+                </select>
+              </label>
+              <span id="timelineWindowTotal" class="hidden text-[11px] font-semibold text-sky-300"></span>
             </div>
           </div>
-          <div class="h-64">
+          <div class="relative h-64">
             <canvas id="timelineChart"></canvas>
+            <p id="timelineEmptyState" class="hidden pointer-events-none absolute inset-0 m-auto h-fit w-fit max-w-[85%] rounded-lg border border-slate-700/80 bg-slate-900/90 px-4 py-2 text-center text-xs text-slate-300 shadow-lg"></p>
           </div>
         </div>
 
         <div class="lg:col-span-6 bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-3">
-          <div>
-            <h2 class="text-sm font-bold text-slate-100">룰별(SID) 정탐 / 오탐 판정 비율</h2>
-            <p class="text-xs text-slate-400">막대에 마우스를 올리면 검토 완료 기준 오탐률(FP Rate)이 표시됩니다.</p>
+          <div class="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 class="text-sm font-bold text-slate-100">룰별(SID) 정탐 / 오탐 판정 비율</h2>
+              <p class="text-xs text-slate-400">막대에 마우스를 올리면 검토 완료 기준 오탐률(FP Rate)이 표시됩니다.</p>
+            </div>
+            <label class="text-[11px] text-slate-400 whitespace-nowrap">
+              조회 기간
+              <select id="rulePeriodSelect" class="ml-1 bg-slate-800 border border-slate-700 rounded px-2 py-1 text-slate-200">
+                <option value="3h" selected>최근 3시간</option>
+                <option value="24h">최근 24시간</option>
+                <option value="7d">최근 7일</option>
+                <option value="all">전체 기간</option>
+              </select>
+            </label>
           </div>
-          <div class="h-64">
+          <fieldset class="flex flex-wrap gap-x-3 gap-y-1 text-[11px]">
+            <legend class="sr-only">표시할 판정</legend>
+            <label class="inline-flex items-center gap-1 text-rose-300"><input type="checkbox" data-rule-verdict="TP" checked class="accent-rose-500" />정탐</label>
+            <label class="inline-flex items-center gap-1 text-emerald-300"><input type="checkbox" data-rule-verdict="FP" checked class="accent-emerald-500" />오탐</label>
+            <label class="inline-flex items-center gap-1 text-amber-300"><input type="checkbox" data-rule-verdict="FN" checked class="accent-amber-500" />미탐</label>
+            <label class="inline-flex items-center gap-1 text-cyan-300"><input type="checkbox" data-rule-verdict="TN" checked class="accent-cyan-500" />정미탐</label>
+            <label class="inline-flex items-center gap-1 text-slate-300"><input type="checkbox" data-rule-verdict="UNREVIEWED" checked class="accent-slate-500" />미검토</label>
+          </fieldset>
+          <p class="text-[10px] text-amber-300">오탐(FP) 집계는 관제 화면의 FP 포함 설정을 따릅니다. 미탐·정미탐은 API 미지원으로 데이터가 없습니다.</p>
+          <div class="relative h-64">
             <canvas id="ruleVerdictChart"></canvas>
+            <p id="ruleVerdictEmptyState" class="hidden pointer-events-none absolute inset-0 m-auto h-fit w-fit max-w-[85%] rounded-lg border border-slate-700/80 bg-slate-900/90 px-4 py-2 text-center text-xs text-slate-300 shadow-lg"></p>
           </div>
         </div>
       </section>
@@ -1549,9 +1584,11 @@
     }
 
     function getVerdictLabel(verdict) {
-      if (verdict === "UNREVIEWED") return "보류(미확정)";
+      if (verdict === "UNREVIEWED") return "미검토";
       if (verdict === "TP") return "정탐";
       if (verdict === "FP") return "오탐";
+      if (verdict === "FN") return "미탐";
+      if (verdict === "TN") return "정미탐";
       return "알 수 없음";
     }
 
@@ -2134,6 +2171,28 @@ function renderTopology(items, selected, targetId = "topologySvgContainer") {
       });
       svg.appendChild(defs);
 
+      const networkBoundary = document.createElementNS(svgNS, "rect");
+      networkBoundary.setAttribute("x", "10");
+      networkBoundary.setAttribute("y", "10");
+      networkBoundary.setAttribute("width", "480");
+      networkBoundary.setAttribute("height", "340");
+      networkBoundary.setAttribute("rx", "8");
+      networkBoundary.setAttribute("fill", "#0b1220");
+      networkBoundary.setAttribute("fill-opacity", "0.35");
+      networkBoundary.setAttribute("stroke", "#38bdf8");
+      networkBoundary.setAttribute("stroke-dasharray", "6 5");
+      networkBoundary.setAttribute("stroke-width", "1.5");
+      svg.appendChild(networkBoundary);
+
+      const networkLabel = document.createElementNS(svgNS, "text");
+      networkLabel.setAttribute("x", "24");
+      networkLabel.setAttribute("y", "30");
+      networkLabel.setAttribute("fill", "#7dd3fc");
+      networkLabel.setAttribute("font-size", "11");
+      networkLabel.setAttribute("font-weight", "bold");
+      networkLabel.textContent = "실습망 · 172.28.0.0/24";
+      svg.appendChild(networkLabel);
+
       const hostIps = [];
       const addHost = (ip) => { if (ip && ip !== "unknown" && !hostIps.includes(ip)) hostIps.push(ip); };
       items.forEach(a => { addHost(a.src_ip); addHost(a.dest_ip); });
@@ -2160,12 +2219,12 @@ function renderTopology(items, selected, targetId = "topologySvgContainer") {
         svg.appendChild(line);
       });
 
-      const suriX = bridgeX, suriY = 255;
+      const suriX = bridgeX, suriY = 272;
       const suriLine = document.createElementNS(svgNS, "line");
       suriLine.setAttribute("x1", String(bridgeX));
       suriLine.setAttribute("y1", String(bridgeY + 24));
       suriLine.setAttribute("x2", String(suriX));
-      suriLine.setAttribute("y2", String(suriY - 14));
+      suriLine.setAttribute("y2", String(suriY - 21));
       suriLine.setAttribute("stroke", "#818cf8");
       suriLine.setAttribute("stroke-dasharray", "3 3");
       suriLine.setAttribute("stroke-width", "1.5");
@@ -2173,11 +2232,11 @@ function renderTopology(items, selected, targetId = "topologySvgContainer") {
 
       const suriGroup = document.createElementNS(svgNS, "g");
       const suriRect = document.createElementNS(svgNS, "rect");
-      suriRect.setAttribute("x", String(suriX - 60));
-      suriRect.setAttribute("y", String(suriY - 12));
-      suriRect.setAttribute("width", "120");
-      suriRect.setAttribute("height", "24");
-      suriRect.setAttribute("rx", "12");
+      suriRect.setAttribute("x", String(suriX - 72));
+      suriRect.setAttribute("y", String(suriY - 21));
+      suriRect.setAttribute("width", "144");
+      suriRect.setAttribute("height", "42");
+      suriRect.setAttribute("rx", "6");
       suriRect.setAttribute("fill", "#1e1b4b");
       suriRect.setAttribute("stroke", "#818cf8");
       suriRect.setAttribute("stroke-width", "1.5");
@@ -2185,13 +2244,22 @@ function renderTopology(items, selected, targetId = "topologySvgContainer") {
 
       const suriText = document.createElementNS(svgNS, "text");
       suriText.setAttribute("x", String(suriX));
-      suriText.setAttribute("y", String(suriY + 4));
+      suriText.setAttribute("y", String(suriY - 3));
       suriText.setAttribute("text-anchor", "middle");
       suriText.setAttribute("fill", "#c7d2fe");
       suriText.setAttribute("font-size", "10");
       suriText.setAttribute("font-weight", "bold");
       suriText.textContent = "👁️ Suricata (관찰자)";
       suriGroup.appendChild(suriText);
+
+      const suriSub = document.createElementNS(svgNS, "text");
+      suriSub.setAttribute("x", String(suriX));
+      suriSub.setAttribute("y", String(suriY + 13));
+      suriSub.setAttribute("text-anchor", "middle");
+      suriSub.setAttribute("fill", "#a5b4fc");
+      suriSub.setAttribute("font-size", "9");
+      suriSub.textContent = "네트워크 관찰";
+      suriGroup.appendChild(suriSub);
       svg.appendChild(suriGroup);
 
       const pairAttackMap = new Map();
@@ -2283,7 +2351,7 @@ function renderTopology(items, selected, targetId = "topologySvgContainer") {
       bridgeRect.setAttribute("y", String(bridgeY - 24));
       bridgeRect.setAttribute("width", "130");
       bridgeRect.setAttribute("height", "48");
-      bridgeRect.setAttribute("rx", "10");
+      bridgeRect.setAttribute("rx", "6");
       bridgeRect.setAttribute("fill", "#0f172a");
       bridgeRect.setAttribute("stroke", "#38bdf8");
       bridgeRect.setAttribute("stroke-width", "2");
@@ -2783,79 +2851,210 @@ function renderTopology(items, selected, targetId = "topologySvgContainer") {
     // ==========================================
     let currentMainView = "soc";
     let timelineChartInstance = null;
-    let timelineGranularity = "minute";
+    let timelineGranularity = "hour";
     let ruleVerdictChartInstance = null;
     let summaryComboChartInstance = null;
 
     function calcAlertTimeline(items, granularity = "minute") {
+      const severities = ["SEV1", "SEV2", "SEV3"];
+      const series = Object.fromEntries(severities.map(severity => [severity, []]));
+      const hourMs = 60 * 60 * 1000;
+      const now = Date.now();
+      const period = document.getElementById("timelinePeriodSelect")?.value || "3h";
+      const validAlerts = (items || []).map(alert => ({
+        alert,
+        timestamp: Date.parse(alert.timestamp || "")
+      })).filter(({ alert, timestamp }) =>
+        Number.isFinite(timestamp) && timestamp <= now && severities.includes(alert.severity)
+      );
+
+      if (granularity === "hour") {
+        const rangeHours = { "3h": 3, "24h": 24, "7d": 7 * 24 };
+        const periodAlerts = period === "all"
+          ? validAlerts
+          : validAlerts.filter(({ timestamp }) => timestamp >= now - rangeHours[period] * hourMs);
+        const startMs = period === "all" && periodAlerts.length
+          ? Math.floor(Math.min(...periodAlerts.map(({ timestamp }) => timestamp)) / hourMs) * hourMs
+          : now - (rangeHours[period] || 3) * hourMs;
+        const bucketCount = period === "all" && !periodAlerts.length
+          ? 0
+          : Math.max(1, Math.ceil((now - startMs) / hourMs));
+        const buckets = Array.from({ length: bucketCount }, () => ({ SEV1: 0, SEV2: 0, SEV3: 0 }));
+        periodAlerts.forEach(({ alert, timestamp }) => {
+          const bucketIndex = Math.min(buckets.length - 1, Math.floor((timestamp - startMs) / hourMs));
+          if (bucketIndex >= 0 && bucketIndex < buckets.length) buckets[bucketIndex][alert.severity] += 1;
+        });
+
+        const bucketTimes = buckets.map((_, index) => [
+          startMs + index * hourMs,
+          Math.min(now, startMs + (index + 1) * hourMs)
+        ]);
+        const hasMultipleDays = new Set(bucketTimes.flatMap(([start, end]) =>
+          [new Date(start).toISOString().slice(0, 10), new Date(end).toISOString().slice(0, 10)]
+        )).size > 1;
+        const formatUtc = timestamp => {
+          const value = new Date(timestamp).toISOString();
+          return hasMultipleDays ? `${value.slice(5, 10)} ${value.slice(11, 16)}` : value.slice(11, 16);
+        };
+        const labels = bucketTimes.map(([bucketStart, bucketEnd]) => {
+          const startLabel = formatUtc(bucketStart);
+          const endLabel = formatUtc(bucketEnd);
+          return `${startLabel}–${endLabel}`;
+        });
+        severities.forEach(severity => {
+          series[severity] = buckets.map(bucket => bucket[severity]);
+        });
+        const hourlyTotals = buckets.map(bucket => severities.reduce((sum, severity) => sum + bucket[severity], 0));
+        return {
+          labels,
+          series,
+          hourlyTotals,
+          total: hourlyTotals.reduce((sum, count) => sum + count, 0)
+        };
+      }
+
       const buckets = new Map();
-      const sorted = [...(items || [])].sort((a, b) => new Date(a.timestamp || 0) - new Date(b.timestamp || 0));
-      sorted.forEach(alert => {
-        if (!alert.timestamp) return;
-        const timePart = String(alert.timestamp).slice(11, 16);
-        const key = granularity === "hour" ? `${timePart.slice(0, 2)}:00` : timePart;
-        if (!buckets.has(key)) buckets.set(key, { SEV1: 0, SEV2: 0, SEV3: 0, SEV4: 0 });
-        const sev = ["SEV1", "SEV2", "SEV3", "SEV4"].includes(alert.severity) ? alert.severity : "SEV4";
-        buckets.get(key)[sev] += 1;
+      validAlerts.filter(({ timestamp }) => timestamp >= now - 3 * hourMs).forEach(({ alert, timestamp }) => {
+        const key = new Date(timestamp).toISOString().slice(0, 16);
+        if (!buckets.has(key)) buckets.set(key, { SEV1: 0, SEV2: 0, SEV3: 0 });
+        buckets.get(key)[alert.severity] += 1;
       });
-      const labels = Array.from(buckets.keys());
-      return {
-        labels,
-        series: {
-          SEV1: labels.map(k => buckets.get(k).SEV1),
-          SEV2: labels.map(k => buckets.get(k).SEV2),
-          SEV3: labels.map(k => buckets.get(k).SEV3),
-          SEV4: labels.map(k => buckets.get(k).SEV4)
-        }
-      };
+      const minuteKeys = Array.from(buckets.keys()).sort();
+      const multipleDays = new Set(minuteKeys.map(key => key.slice(0, 10))).size > 1;
+      const labels = minuteKeys.map(key => multipleDays
+        ? `${key.slice(5, 10)} ${key.slice(11, 16)}`
+        : key.slice(11, 16));
+      severities.forEach(severity => {
+        series[severity] = minuteKeys.map(key => buckets.get(key)[severity]);
+      });
+      return { labels, series, hourlyTotals: [], total: 0 };
     }
 
     function renderTimelineChart(items) {
       const canvas = document.getElementById("timelineChart");
       if (!canvas) return;
-      const { labels, series } = calcAlertTimeline(items, timelineGranularity);
-      const datasets = ["SEV1", "SEV2", "SEV3", "SEV4"].map(sev => ({
-        label: sev, data: series[sev], backgroundColor: getSeverityHexColor(sev), borderRadius: 3
+      const isHourly = timelineGranularity === "hour";
+      const { labels, series, hourlyTotals, total } = calcAlertTimeline(items, timelineGranularity);
+      const datasets = ["SEV1", "SEV2", "SEV3"].map((severity, index) => ({
+        label: `SEV ${index + 1}`,
+        data: series[severity],
+        backgroundColor: getSeverityHexColor(severity),
+        borderRadius: 4,
+        categoryPercentage: 0.76,
+        barPercentage: 0.82,
+        maxBarThickness: 26
       }));
+      if (isHourly) {
+        datasets.push({
+          label: "총 누적 경보",
+          data: hourlyTotals,
+          backgroundColor: "#cbd5e1",
+          borderRadius: 4,
+          categoryPercentage: 0.76,
+          barPercentage: 0.82,
+          maxBarThickness: 26
+        });
+      }
+      const totalEl = document.getElementById("timelineWindowTotal");
+      totalEl.classList.toggle("hidden", !isHourly);
+      const periodLabels = { "3h": "최근 3시간", "24h": "최근 24시간", "7d": "최근 7일", all: "전체 기간" };
+      if (isHourly) totalEl.textContent = `${periodLabels[document.getElementById("timelinePeriodSelect")?.value || "3h"]} 누적: ${total}건`;
+      const emptyState = document.getElementById("timelineEmptyState");
+      const hasTimelineData = isHourly ? total > 0 : labels.length > 0;
+      emptyState.textContent = isHourly
+        ? `${periodLabels[document.getElementById("timelinePeriodSelect")?.value || "3h"]} 내 SEV 1~3 경보가 없습니다.`
+        : "최근 3시간 내 SEV 1~3 경보가 없습니다.";
+      emptyState.classList.toggle("hidden", hasTimelineData);
+
       if (!timelineChartInstance) {
         timelineChartInstance = new Chart(canvas.getContext("2d"), {
           type: "bar",
           data: { labels, datasets },
           options: {
+            indexAxis: "x",
             responsive: true,
             maintainAspectRatio: false,
-            plugins: { legend: { position: "top", labels: { color: "#cbd5e1", boxWidth: 10, font: { size: 11 } } } },
+            layout: { padding: { top: 4, right: 8, bottom: 0, left: 0 } },
+            plugins: {
+              legend: {
+                position: "top",
+                align: "start",
+                labels: { color: "#cbd5e1", boxWidth: 9, boxHeight: 9, padding: 14, font: { size: 10 } }
+              },
+              tooltip: {
+                backgroundColor: "rgba(15, 23, 42, 0.96)",
+                borderColor: "#334155",
+                borderWidth: 1,
+                padding: 9,
+                callbacks: {
+                  label: context => `${context.dataset.label}: ${context.parsed.y}건`
+                }
+              }
+            },
             scales: {
-              x: { stacked: true, ticks: { color: "#cbd5e1", font: { size: 10 } }, grid: { display: false } },
-              y: { stacked: true, beginAtZero: true, ticks: { stepSize: 1, color: "#94a3b8" }, grid: { color: "#1e293b" } }
+              x: {
+                stacked: false,
+                title: { display: true, text: isHourly ? "시간 구간 (UTC)" : "분 단위 (UTC)", color: "#94a3b8" },
+                ticks: {
+                  autoSkip: true,
+                  maxTicksLimit: isHourly ? (document.getElementById("timelinePeriodSelect")?.value === "3h" ? 3 : 8) : 8,
+                  maxRotation: 0,
+                  minRotation: 0,
+                  color: "#cbd5e1",
+                  padding: 8,
+                  font: { size: 10 }
+                },
+                grid: { display: false }
+              },
+              y: {
+                stacked: false,
+                beginAtZero: true,
+                title: { display: true, text: "경보 건수", color: "#94a3b8" },
+                ticks: { stepSize: 1, color: "#94a3b8" },
+                grid: { color: "#1e293b" }
+              }
             }
           }
         });
       } else {
         timelineChartInstance.data.labels = labels;
         timelineChartInstance.data.datasets = datasets;
+        timelineChartInstance.options.indexAxis = "x";
+        timelineChartInstance.options.scales.x.stacked = false;
+        timelineChartInstance.options.scales.x.title.text = isHourly ? "시간 구간 (UTC)" : "분 단위 (UTC)";
+        timelineChartInstance.options.scales.x.ticks.maxTicksLimit = isHourly
+          ? (document.getElementById("timelinePeriodSelect")?.value === "3h" ? 3 : 8)
+          : 8;
+        timelineChartInstance.options.scales.y.stacked = false;
         timelineChartInstance.update("none");
       }
     }
 
-    function calcRuleVerdictStats(items) {
+    function calcRuleVerdictStats(items, periodKey) {
       const map = new Map();
+      const endMs = Date.now();
+      const periodMs = { "3h": 3 * 60 * 60 * 1000, "24h": 24 * 60 * 60 * 1000, "7d": 7 * 24 * 60 * 60 * 1000 }[periodKey];
       (items || []).forEach(alert => {
+        if (periodKey !== "all") {
+          const timestamp = Date.parse(alert.timestamp || "");
+          if (!Number.isFinite(timestamp) || timestamp < endMs - periodMs || timestamp > endMs) return;
+        }
         const sid = alert.sid ?? "UNKNOWN";
         const cat = String(alert.category || "unknown").toUpperCase();
         const key = String(sid);
-        if (!map.has(key)) map.set(key, { sid: key, label: `${key} (${cat})`, TP: 0, FP: 0, UNREVIEWED: 0, total: 0 });
+        if (!map.has(key)) map.set(key, { sid: key, label: `${key} (${cat})`, TP: 0, FP: 0, FN: 0, TN: 0, UNREVIEWED: 0, total: 0 });
         const row = map.get(key);
-        const verdict = ["TP", "FP", "UNREVIEWED"].includes(alert.verdict) ? alert.verdict : "UNREVIEWED";
+        const verdict = ["TP", "FP", "FN", "TN", "UNREVIEWED"].includes(alert.verdict) ? alert.verdict : "UNREVIEWED";
         row[verdict] += 1;
         row.total += 1;
       });
       const rows = Array.from(map.values()).sort((a, b) => b.total - a.total);
       return {
         labels: rows.map(r => r.label),
-        tp: rows.map(r => r.TP),
-        fp: rows.map(r => r.FP),
-        unreviewed: rows.map(r => r.UNREVIEWED),
+        counts: Object.fromEntries(["TP", "FP", "FN", "TN", "UNREVIEWED"].map(verdict => [
+          verdict,
+          rows.map(row => row[verdict])
+        ])),
         rows
       };
     }
@@ -2863,18 +3062,41 @@ function renderTopology(items, selected, targetId = "topologySvgContainer") {
     function renderRuleVerdictChart(items) {
       const canvas = document.getElementById("ruleVerdictChart");
       if (!canvas) return;
-      const stats = calcRuleVerdictStats(items);
-      const datasets = [
-        { label: "정탐 (TP)", data: stats.tp, backgroundColor: "#f43f5e", borderRadius: 3 },
-        { label: "오탐 (FP)", data: stats.fp, backgroundColor: "#10b981", borderRadius: 3 },
-        { label: "보류(미확정) (UNREVIEWED)", data: stats.unreviewed, backgroundColor: "#64748b", borderRadius: 3 }
+      const periodKey = document.getElementById("rulePeriodSelect").value;
+      const stats = calcRuleVerdictStats(items, periodKey);
+      const visibleVerdicts = new Set(
+        Array.from(document.querySelectorAll("[data-rule-verdict]:checked"), input => input.dataset.ruleVerdict)
+      );
+      const verdictDatasets = [
+        { verdict: "TP", label: "정탐 (TP)", backgroundColor: "#f43f5e" },
+        { verdict: "FP", label: "오탐 (FP)", backgroundColor: "#10b981" },
+        { verdict: "FN", label: "미탐 (FN · API 미지원)", backgroundColor: "#f59e0b" },
+        { verdict: "TN", label: "정미탐 (TN · API 미지원)", backgroundColor: "#06b6d4" },
+        { verdict: "UNREVIEWED", label: "미검토", backgroundColor: "#64748b" }
       ];
+      const datasets = verdictDatasets
+        .filter(item => visibleVerdicts.has(item.verdict))
+        .map(item => ({ label: item.label, data: stats.counts[item.verdict], backgroundColor: item.backgroundColor, borderRadius: 3 }));
+      const emptyState = document.getElementById("ruleVerdictEmptyState");
+      const hasSelectedData = Array.from(visibleVerdicts).some(verdict =>
+        stats.counts[verdict].some(count => count > 0)
+      );
+      emptyState.textContent = visibleVerdicts.size === 0
+        ? "표시할 판정을 선택하세요."
+        : "선택한 기간과 판정에 해당하는 경보가 없습니다.";
+      emptyState.classList.toggle("hidden", visibleVerdicts.size > 0 && hasSelectedData);
       const fpTooltipCb = (tooltipItems) => {
         const row = stats.rows[tooltipItems[0]?.dataIndex];
         if (!row) return "";
         const reviewed = row.TP + row.FP;
         if (reviewed === 0) return "검토된 경보 없음 (오탐률 계산 불가)";
         return `검토 기준 오탐률(FP Rate): ${((row.FP / reviewed) * 100).toFixed(1)}% (${row.FP}/${reviewed})`;
+      };
+      const verdictTooltipCb = context => {
+        const row = stats.rows[context.dataIndex];
+        const count = Number(context.raw) || 0;
+        const rate = row && row.total > 0 ? (count / row.total) * 100 : 0;
+        return `${context.dataset.label}: ${count}건 (${rate.toFixed(1)}%)`;
       };
       if (!ruleVerdictChartInstance) {
         ruleVerdictChartInstance = new Chart(canvas.getContext("2d"), {
@@ -2886,7 +3108,12 @@ function renderTopology(items, selected, targetId = "topologySvgContainer") {
             maintainAspectRatio: false,
             plugins: {
               legend: { position: "top", labels: { color: "#cbd5e1", boxWidth: 10, font: { size: 11 } } },
-              tooltip: { callbacks: { afterBody: fpTooltipCb } }
+              tooltip: {
+                callbacks: {
+                  label: verdictTooltipCb,
+                  afterBody: fpTooltipCb
+                }
+              }
             },
             scales: {
               x: { stacked: true, beginAtZero: true, ticks: { stepSize: 1, color: "#94a3b8" }, grid: { color: "#1e293b" } },
@@ -2897,6 +3124,7 @@ function renderTopology(items, selected, targetId = "topologySvgContainer") {
       } else {
         ruleVerdictChartInstance.data.labels = stats.labels;
         ruleVerdictChartInstance.data.datasets = datasets;
+        ruleVerdictChartInstance.options.plugins.tooltip.callbacks.label = verdictTooltipCb;
         ruleVerdictChartInstance.options.plugins.tooltip.callbacks.afterBody = fpTooltipCb;
         ruleVerdictChartInstance.update("none");
       }
@@ -3100,15 +3328,22 @@ function renderTopology(items, selected, targetId = "topologySvgContainer") {
 
     document.getElementById("btnTimelineMin")?.addEventListener("click", () => {
       timelineGranularity = "minute";
+      document.getElementById("timelinePeriodSelect").disabled = true;
       document.getElementById("btnTimelineMin").className = "px-2.5 py-1 rounded font-semibold bg-sky-600 text-white transition";
       document.getElementById("btnTimelineHour").className = "px-2.5 py-1 rounded font-semibold text-slate-400 hover:text-white transition";
       renderTimelineChart(alertsData);
     });
     document.getElementById("btnTimelineHour")?.addEventListener("click", () => {
       timelineGranularity = "hour";
+      document.getElementById("timelinePeriodSelect").disabled = false;
       document.getElementById("btnTimelineHour").className = "px-2.5 py-1 rounded font-semibold bg-sky-600 text-white transition";
       document.getElementById("btnTimelineMin").className = "px-2.5 py-1 rounded font-semibold text-slate-400 hover:text-white transition";
       renderTimelineChart(alertsData);
+    });
+    document.getElementById("timelinePeriodSelect")?.addEventListener("change", () => renderTimelineChart(alertsData));
+    document.getElementById("rulePeriodSelect")?.addEventListener("change", () => renderRuleVerdictChart(alertsData));
+    document.querySelectorAll("[data-rule-verdict]").forEach(input => {
+      input.addEventListener("change", () => renderRuleVerdictChart(alertsData));
     });
 
     // ==========================================
