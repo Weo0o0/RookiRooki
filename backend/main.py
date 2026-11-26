@@ -20,6 +20,12 @@ from .eve_parser import extract_event_types, mask_text, parse_eve
 
 MAX_UPLOAD_BYTES = 20 * 1024 * 1024
 ROOT = Path(__file__).resolve().parent.parent
+ANALYST_MAX_LEN = 50
+FP_EXCLUDE_SQL = "IFNULL(verdict, 'UNREVIEWED') != 'FP'"
+ALERT_EXTRA_COLUMNS = (
+    ("analyst", "TEXT DEFAULT ''"),
+    ("action_status", "TEXT DEFAULT 'NONE'"),
+)
 
 @asynccontextmanager
 async def lifespan(_app):
@@ -52,6 +58,8 @@ ALERT_KEYS = (
     "observation",
     "assessment",
     "confidence",
+    "analyst",
+    "action_status",
     "playbook",
 )
 
@@ -87,6 +95,8 @@ class TriageUpdate(BaseModel):
     confidence: Optional[Literal["HIGH", "MEDIUM", "LOW"]] = None
     observation: Optional[str] = Field(None, max_length=2000)
     assessment: Optional[str] = Field(None, max_length=2000)
+    analyst: Optional[str] = Field(None, max_length=ANALYST_MAX_LEN)
+    action_status: Optional[Literal["ISOLATED", "GUIDE_ONLY", "NONE"]] = None
 
 def config(name, default):
     return Path(os.getenv(name, str(default)))
@@ -102,6 +112,17 @@ def playbooks_path():
 
 def rule_catalog_path():
     return config("RULE_CATALOG_PATH", ROOT / "rules" / "rule_catalog.json")
+
+def ensure_alert_columns(db):
+    existing = {row[1] for row in db.execute("PRAGMA table_info(alerts)").fetchall()}
+    for name, decl in ALERT_EXTRA_COLUMNS:
+        if name in existing:
+            continue
+        try:
+            db.execute(f"ALTER TABLE alerts ADD COLUMN {name} {decl}")
+        except sqlite3.OperationalError as exc:
+            if "duplicate column name" not in str(exc).lower():
+                raise
 
 def init_db():
     path = db_path()
@@ -127,8 +148,11 @@ def init_db():
             "verdict TEXT DEFAULT 'UNREVIEWED', "
             "observation TEXT DEFAULT '', "
             "assessment TEXT DEFAULT '', "
-            "confidence TEXT DEFAULT 'MEDIUM')"
+            "confidence TEXT DEFAULT 'MEDIUM', "
+            "analyst TEXT DEFAULT '', "
+            "action_status TEXT DEFAULT 'NONE')"
         )
+        ensure_alert_columns(db)
         db.execute("DROP INDEX IF EXISTS ux_alert_identity")
         try:
             db.execute(
@@ -281,6 +305,8 @@ def build_alert_dict(row, playbooks: Dict[str, Any]) -> Dict[str, Any]:
         "observation": row["observation"],
         "assessment": row["assessment"],
         "confidence": row["confidence"],
+        "analyst": row["analyst"],
+        "action_status": row["action_status"],
         "playbook": playbook_entry,
     }
 
@@ -398,23 +424,25 @@ def get_alerts(
     severity: Optional[str] = Query(None, pattern=r"^(SEV1|SEV2|SEV3|SEV4)$"),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
+    include_fp: int = Query(0, ge=0, le=1),
 ):
     init_db()
     playbooks = load_playbooks()
+    conditions: List[str] = []
+    params: List[Any] = []
+    if severity is not None:
+        conditions.append("severity = ?")
+        params.append(severity)
+    if not include_fp:
+        conditions.append(FP_EXCLUDE_SQL)
+    where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
     with closing(sqlite3.connect(db_path())) as db:
         db.row_factory = sqlite3.Row
-        if severity is not None:
-            total = db.execute("SELECT COUNT(*) FROM alerts WHERE severity = ?", (severity,)).fetchone()[0]
-            rows = db.execute(
-                "SELECT * FROM alerts WHERE severity = ? ORDER BY id DESC LIMIT ? OFFSET ?",
-                (severity, limit, offset),
-            ).fetchall()
-        else:
-            total = db.execute("SELECT COUNT(*) FROM alerts").fetchone()[0]
-            rows = db.execute(
-                "SELECT * FROM alerts ORDER BY id DESC LIMIT ? OFFSET ?",
-                (limit, offset),
-            ).fetchall()
+        total = db.execute(f"SELECT COUNT(*) FROM alerts {where}", params).fetchone()[0]
+        rows = db.execute(
+            f"SELECT * FROM alerts {where} ORDER BY id DESC LIMIT ? OFFSET ?",
+            (*params, limit, offset),
+        ).fetchall()
 
     items = [build_alert_dict(row, playbooks) for row in rows]
     return {
@@ -456,6 +484,8 @@ def update_triage(alert_id: int, payload: TriageUpdate):
     o_val = masked_obs
     a_val = masked_assess
     c_val = provided.get("confidence")
+    n_val = provided["analyst"].strip() if provided.get("analyst") is not None else None
+    s_val = provided.get("action_status")
 
     playbooks = load_playbooks()
     with closing(sqlite3.connect(db_path())) as db:
@@ -469,10 +499,12 @@ def update_triage(alert_id: int, payload: TriageUpdate):
             "verdict = COALESCE(?, verdict), "
             "observation = COALESCE(?, observation), "
             "assessment = COALESCE(?, assessment), "
-            "confidence = COALESCE(?, confidence) "
+            "confidence = COALESCE(?, confidence), "
+            "analyst = COALESCE(?, analyst), "
+            "action_status = COALESCE(?, action_status) "
             "WHERE id = ?"
         )
-        db.execute(sql, (v_val, o_val, a_val, c_val, alert_id))
+        db.execute(sql, (v_val, o_val, a_val, c_val, n_val, s_val, alert_id))
         db.commit()
 
         row = db.execute("SELECT * FROM alerts WHERE id = ?", (alert_id,)).fetchone()
@@ -484,13 +516,15 @@ def live_status():
     return live_capture.status()
 
 @app.get("/api/stats", response_model=StatsResult)
-def stats():
+def stats(include_fp: int = Query(0, ge=0, le=1)):
     init_db()
+    where = "" if include_fp else f"WHERE {FP_EXCLUDE_SQL}"
+    mitre_where = "WHERE mitre_id IS NOT NULL" + ("" if include_fp else f" AND {FP_EXCLUDE_SQL}")
     with closing(sqlite3.connect(db_path())) as db:
-        total = db.execute("SELECT COUNT(*) FROM alerts").fetchone()[0]
-        severity = dict(db.execute("SELECT severity, COUNT(*) FROM alerts GROUP BY severity").fetchall())
-        category = dict(db.execute("SELECT category, COUNT(*) FROM alerts GROUP BY category").fetchall())
-        mitre = [row[0] for row in db.execute("SELECT DISTINCT mitre_id FROM alerts WHERE mitre_id IS NOT NULL ORDER BY mitre_id").fetchall()]
+        total = db.execute(f"SELECT COUNT(*) FROM alerts {where}").fetchone()[0]
+        severity = dict(db.execute(f"SELECT severity, COUNT(*) FROM alerts {where} GROUP BY severity").fetchall())
+        category = dict(db.execute(f"SELECT category, COUNT(*) FROM alerts {where} GROUP BY category").fetchall())
+        mitre = [row[0] for row in db.execute(f"SELECT DISTINCT mitre_id FROM alerts {mitre_where} ORDER BY mitre_id").fetchall()]
 
         ingest_sources_rows = db.execute("SELECT source FROM ingest_sources").fetchall()
         present_sources = {row[0] for row in ingest_sources_rows}
