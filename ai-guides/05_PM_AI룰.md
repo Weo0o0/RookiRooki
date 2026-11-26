@@ -20,7 +20,7 @@
 | 필수 | PR 순서 | 아래 순서가 지켜지는지, 한 파일이 두 역할에 의해 동시에 바뀌지 않는지 봅니다. |
 | 필수 | 파일 소유권 | 역할이 아닌 파일을 고친 PR은 되돌려 달라고 하거나, 합의 후 진행합니다. |
 | 권장 | 프론트 | Live 버그 3개(`items` 파싱, 플레이북 구조, 상세 비우기)가 6종 UI와 한 PR로 오는지 확인합니다. 이게 안 되면 Live 시연이 비어 있습니다. |
-| 권장 | Feature Freeze | Day3 18:00 이후에는 새 기능을 넣지 않고, 버그 수정과 시연 준비만 합니다. |
+| 권장 | Feature Freeze | Feature Freeze는 11/26 18:00(기존 Day3 18:00에서 이동)입니다. 동결 이후에는 새 기능을 넣지 않고, 버그 수정과 시연 준비만 합니다. 11/27은 발표일(버그 수정만)입니다. |
 | 하지 말 것 | 열린 값이 없는데 숫자 지정 | 「아직 패킷을 받지 않았으니, 받은 뒤에 정하자」고 답하면 됩니다. |
 
 파일 소유권(한 파일은 한 역할만)
@@ -48,7 +48,7 @@ cd ~/RookiRooki
 git checkout main
 git pull origin main
 git log --oneline -8
-# 머리가 0a70475(PR #10) 이후인지만 먼저 봅니다. 그 뒤에 팀 PR이 머지되면 머리가 바뀝니다.
+# 머리가 ae5b53a(PR #43) 이후인지만 먼저 봅니다. 그 뒤에 팀 PR이 머지되면 머리가 바뀝니다.
 
 # portscan 80이 남았는지(선행 PR 전)
 python3 -c "
@@ -82,9 +82,9 @@ for i,l in enumerate(p.read_text().splitlines(),1):
 당신은 Mini-SIEM(저장소 Weo0o0/RookiRooki)의 PM 담당을 돕는 안내자입니다. 계약을 임의로 바꾸지 마세요. 코드·파일·팀이 준 패킷·로그·내가 붙여 넣은 질문만 사용하세요. 비어 있는 숫자를 지어내지 마세요.
 
 ## 프로젝트 맥락
-기준은 origin/main 0a70475 (PR #10 머지 후)입니다.
-4일 일정, Day3 18:00 Feature Freeze, Day4 시연.
-1단계 흐름: 실습망에서 공격 → 브리지 tcpdump 녹화 → POST /api/pcap/upload → suricata -r → SQLite → 웹 Live 모드. 실시간 Suricata와 실제 차단 실행은 Backlog입니다.
+기준은 origin/main ae5b53a (PR #43 머지 후)입니다.
+4일 일정, Feature Freeze는 11/26 18:00(기존 Day3 18:00에서 이동), 11/27은 발표일(버그 수정만)입니다.
+1단계 흐름: 실습망에서 공격 → 브리지 tcpdump 녹화 → POST /api/pcap/upload → suricata -r → SQLite → 웹 Live 모드. 실시간 캡처는 선택 기능(`LIVE_CAPTURE_ENABLED=1`)으로, 승인 기반 격리(`ISOLATION_ENABLED=1`)는 구현되어 있으며, 호스트 방화벽 실행과 자동 차단은 Backlog입니다.
 작업은 기능 브랜치 → PR. main 직접 푸시 금지. 닫힌 옛 브랜치 feat/backend-skeleton 은 머지 금지(지금 main과 파일 충돌).
 차별화 4개는 유지합니다: (1) 같은 요청 HTTP 200이면 SEV1 격상 (2) password=/token= [MASKED] (3) OSI 흐름과 차단·확인·롤백 명령어 안내(실행은 하지 않음) (4) PCAP 룰 테스트와 MITRE 커버리지.
 

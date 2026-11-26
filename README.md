@@ -103,7 +103,7 @@ flowchart LR
 ## 빠른 시작
 
 1. **설치 및 환경 구축**: [docs/설치_테스트_가이드.md](docs/설치_테스트_가이드.md)를 따라 WSL2 Ubuntu, Python `.venv`, Suricata, Docker 환경을 설치합니다.
-2. **설치 확인**: `python -m pytest backend/tests -q`(`59 passed`), 백엔드(`uvicorn backend.main:app --port 8000`, `:8000`), 프론트엔드(`python3 -m http.server 5500`, `:5500`) 실행을 확인합니다.
+2. **설치 확인**: `python -m pytest backend/tests -q`(`59 passed`), 백엔드(`uvicorn backend.main:app --port 8000`, `:8000`), 프론트엔드(`python3 -m http.server 5500 --bind 127.0.0.1`, `:5500`) 실행을 확인합니다.
 3. **전체 기능 체험**: [docs/RookiRooki_전체기능_체험_종합명령어.md](docs/RookiRooki_전체기능_체험_종합명령어.md) 순서대로 Mock 모드, PCAP 업로드, 6종 라이브 탐지, 트리아지, Discord 알림 및 승인 기반 격리를 체험합니다.
 
 ## 실행 방법
@@ -295,7 +295,7 @@ Backlog의 Stage 2 항목으로 기획되었던 브리지 실시간 eve.json 수
 - **실행 조건:** 격리를 켠 서버는 `--host 0.0.0.0`으로 열지 않고(기본 `127.0.0.1` 유지), `--reload`·`--workers` 없이 프로세스 1개로 실행합니다(토큰이 메모리에 있음). 사용자 계정이 `docker` 그룹이어야 하며 이는 문서로만 안내합니다.
 - **Discord 격리 확인 링크:** SEV1 경보에 `isolation_token`이 있을 때만 Discord 알림 embed에 `격리 확인` 링크(`frontend/isolate.html?alert_id=<N>#token=<T>`)가 포함됩니다.
 - **수동 승인 전용:** 확인 페이지는 열기만 해서는 절대 격리하지 않으며(GET 조회만 수행), 화면에서 `[승인(격리 실행)]` 버튼을 눌렀을 때만 `POST /api/isolate`를 호출합니다.
-- **접속 방법 및 주의:** `frontend/`에서 `python3 -m http.server 5500`을 실행해 `http://localhost:5500`으로 열어야 하며, `localhost` 링크는 백엔드가 실행 중인 같은 PC의 브라우저에서만 동작합니다.
+- **접속 방법 및 주의:** `frontend/`에서 `python3 -m http.server 5500 --bind 127.0.0.1`을 실행해 `http://localhost:5500`으로 열어야 하며, `localhost` 링크는 백엔드가 실행 중인 같은 PC의 브라우저에서만 동작합니다.
 
 ## 4일 일정
 
@@ -331,7 +331,7 @@ PM이 `policies/sev_sla_policy.json`으로 관리합니다. 초안 기준은 다
 
 **구현 범위.** Discord 웹훅으로 새 경보 요약을 보내고, 메시지에 해당 경보 딥링크 및 SEV1 경보 시 격리 확인 페이지(`isolate.html`) 링크를 제공합니다.
 
-**동작 방식.** 경보를 저장한 뒤, 환경변수 `SIEM_WEBHOOK_URL`이 있을 때만 HTTP로 웹훅을 보냅니다. URL은 코드·저장소·문서 예시에 실주소를 넣지 않습니다. 딥링크 예시는 `http://localhost:8000/?alert_id=101`입니다. 200 OK로 SEV1 격상된 건은 항상 알립니다. 임시 차단 API 중 **승인 기반 격리(`attacker` 컨테이너 분리)와 수동 해제는 구현 완료**되었습니다.
+**동작 방식.** Discord 알림은 프론트엔드가 브라우저에 입력된 웹훅 주소로 직접 전송합니다(주소는 브라우저 탭 세션에만 저장하며, 코드·저장소·문서 예시에 실주소를 넣지 않습니다). Live API에서 새로 들어온 SEV1 경보와 SEV3에서 SEV1로 격상된 경보(#42)는, 자동 알림이 켜져 있고 웹훅이 설정되어 있으면 경보당 한 번 발송됩니다. 기본 목록에서 숨긴 오탐(FP)은 자동 알림 대상이 아닙니다. 임시 차단 API 중 **승인 기반 격리(`attacker` 컨테이너 분리)와 수동 해제는 구현 완료**되었습니다.
 
 ### 2. 시각적 정보 제공 (공격 스토리 · 계층·경로 · 정상/공격 흐름) [구현 완료]
 
