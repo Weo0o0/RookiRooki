@@ -142,7 +142,7 @@ def test_rejections_never_call_docker(env, monkeypatch):
     assert client.post("/api/isolate", json={"alert_id": alert_id, "token": "\u00e9" * 5}).status_code == 403
     assert client.post("/api/isolate", json={"alert_id": 99999, "token": token}).status_code == 404
     assert client.post("/api/isolate", json={"alert_id": alert_id}).status_code == 422
-    assert client.post("/api/isolate", json={"alert_id": alert_id, "token": token, "ip": "1.1.1.1"}).status_code == 422
+    assert client.post("/api/isolate", json={"alert_id": alert_id, "token": token, "ip": "10.0.0.6"}).status_code == 422
     for ip in ("172.28.0.11", "172.28.0.1", "10.0.0.5"):
         other = add(src_ip=ip)
         res = client.post("/api/isolate", json={"alert_id": other, "token": token})
