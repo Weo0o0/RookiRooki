@@ -1134,7 +1134,7 @@
 
       fetchLiveStatus();
       try {
-        const res = await fetch(`${API_BASE}/api/alerts?limit=50`);
+        const res = await fetch(`${API_BASE}/api/alerts?limit=200`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         if (!data || !Array.isArray(data.items)) {
